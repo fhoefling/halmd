@@ -18,6 +18,7 @@ halmd_add_modules(
 add_subdirectory(forces)
 add_subdirectory(fields)
 add_subdirectory(integrators)
+add_subdirectory(mobilities)
 add_subdirectory(positions)
 add_subdirectory(potentials)
 add_subdirectory(sorts)
