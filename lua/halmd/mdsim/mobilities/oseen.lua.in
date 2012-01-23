@@ -34,12 +34,12 @@ local oseen_wrapper = {
       , [3] = libhalmd.mdsim.host.mobilities.oseen_3_
     }
 }
- -- if libhalmd.mdsim.gpu then
- --     oseen_wrapper.gpu = {
- --         [2] = libhalmd.mdsim.gpu.mobilities.oseen_2_
- --       , [3] = libhalmd.mdsim.gpu.mobilities.oseen_3_
- --     }
- -- end
+if libhalmd.mdsim.gpu then
+    oseen_wrapper.gpu = {
+        [2] = libhalmd.mdsim.gpu.mobilities.oseen_2_
+      , [3] = libhalmd.mdsim.gpu.mobilities.oseen_3_
+    }
+end
 -- to import from comamndline / HF5 files:
 local h5 = libhalmd.h5
 local po = libhalmd.po
@@ -78,6 +78,14 @@ function new(args)
     core:on_prepend_integrate{mobility.compute_velocities, tracker = mobility}
 
     return mobility
+end
+
+--
+-- connect runtime accumulators to module profiler
+--
+function profile(self, profiler)
+    profiler:on_profile{self, compute_velocities = "compute velocities due to hydrodynamic interactions directly"}
+    profiler:on_profile{self, compute = "compute mobility matrix from hydrodynamic interactions"}
 end
 
 --

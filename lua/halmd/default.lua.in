@@ -49,6 +49,9 @@ local function script()
     -- setup optional external field
     mdsim.field()
 
+    -- setup mobility module
+    mdsim.mobility()
+
     -- Construct sampler.
     local sampler = observables.sampler()
 
