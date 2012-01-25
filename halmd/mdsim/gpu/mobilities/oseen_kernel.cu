@@ -23,7 +23,7 @@
 #include <halmd/mdsim/gpu/particle_kernel.cuh> // tagged/untagged
 #include <halmd/numeric/blas/fixed_vector/operators.hpp> //inner_product()
 #include <halmd/numeric/mp/dsfloat.hpp> // sqrt
-#include <halmd/utility/gpu/thread.cuh> // TID
+#include <halmd/utility/gpu/thread.cuh> // TID etc.
 
 
 using namespace halmd::algorithm::gpu;
@@ -39,16 +39,12 @@ namespace gpu {
 namespace mobilities {
 namespace oseen_kernel {
 
-
-
 /**
-  * compute interactive-mobility
+  * \brief Compute interactive-mobility.
   *
   * @tparam order order of precision in (r/a) (1,2: oseen, >3: rotne-prager)
   * \note It is passed as template parameter, so that the compiler can decide
   * whether to implement oseen or rotne-prager part.
-  *
-  * \note This function is (normally) inlined automatically.
   */
 template<
     int order
@@ -109,6 +105,35 @@ __device__ void interaction_mobility(
   * @tparam vector_type_ dsfloat-vector type with appropriate dimension. If USE_OSEEN_DSFUN is set: dsfun. Else: float.
   * @tparam gpu_vector_type either float4 in 3D or float2 in 2D. Enables coalesced storage of forces.
   *
+  * \note
+  * In order to decrease the necessity for threads to read data
+  * from the global memory, use shared memory of each block.  In
+  * each step, the threads of one warp transfer data from global
+  * to shared memory.  All threads of this block (which solely
+  * have access to the shared memory) then read this data and
+  * compute the velocities for `their' particle.  Then data from
+  * the next particles are read -- again by threads of one warp.
+  *
+  * \note
+  * In order not to use too much shared memory (especially for
+  * older cards this is an important issue), only the threads of
+  * one warp read from global memory.  As the card cannot handle
+  * global read requests from different warps, this scheme is as
+  * fast as if all warps would transfer data from global to
+  * shared memory (as proposed in eg. CUDA C Programming Guide)
+  * -- but it uses far less memory.
+  *
+  * \note
+  * An alternative, and more simple, method is, to read all data
+  * from global memory directly.  This is supposed to be slow
+  * (cf. eg. CUDA C Programming Guide), but since the data for
+  * is aligned so well in global memory, it's in fact fast (even
+  * slightly faster than this algorihm).  Yet we have decided to
+  * use the algorithm above, as it turned out to be quite stable
+  * (even when data should not be aligned that well in global
+  * memory it was fast) and we suppose, that it will adapt
+  * better to new CUDA architectures.
+  *
   */
 template<
     int order
@@ -127,51 +152,41 @@ __global__ void _compute_velocities(
 )
 {
     // get information which thread this is and thus which particles are to be processed
-    unsigned int const i = GTID; // thread ID within grid
-    unsigned int const threads_block = TDIM; // threads per block
+    unsigned int const i = GTID;             // thread ID within grid
     unsigned int const threads_grid = GTDIM; // threads per grid
 
-    /* shared memory for this block
-     *
-     * In order to decrease the necessity for threads to read data from the
-     * global memory, each block has some shared memory. It reads \e threads
-     * particle positions and forces from global memory and stores them in the
-     * shared memory. Then the threads in a block compute the velocities
-     * resulting from this information. Only in the next timestep, information
-     * from the global memory is being requested.
-     *
-     * \note CUDA only allows one pointer to shared memory. Yet there is the
-     * special construct \code extern __shared__ type name[]; \endcode which
-     * will create a (the) pointer to shared memory.  For this to work, a
-     * default-shared-size must be passed to CUDA. This is done via a size_t
-     * parameter in cuda::configure(..). It's the optional third parameter. So
-     * make sure that configure(..) is called properly in the cpp file.
-     */
+    // shared memory for this block
+    //
+    // CUDA only allows one pointer to shared memory.  Yet there is the
+    // special construct
+    //     extern __shared__ type name[];
+    // which will create a (the) pointer to shared memory.  For this to work, a
+    // default-shared-size must be passed to CUDA.  This is done via the third, optional,
+    // parameter in cuda::configure(..).
     extern __shared__ char s_mem[];
-    //! position of other particles in shared memory
+    // position of other particles in shared memory
     float4* const s_positions = reinterpret_cast<float4*>(s_mem);
-    //! forces of other particles in shared memory
-    gpu_vector_type* const s_forces = reinterpret_cast<gpu_vector_type*>(&s_positions[threads_block]);
+    // forces of other particles in shared memory
+    gpu_vector_type* const s_forces = reinterpret_cast<gpu_vector_type*>(&s_positions[WARP_SIZE]);
 
     // position of particle associated with this particular thread (single precision)
     //
     // Although for particles with i >= npart the following does not make sense
-    // (as there are no positions to be fetched), it does not harm though. The
+    // (as there are no positions to be fetched), it does not harm though.  The
     // particle module creates vectors big enough so that this operation will
-    // not fail. So for each thread connected to a ghost particle there will be
-    // one superfluous access to global memory. However if there was an
+    // not fail.  So for each thread connected to a ghost particle there will be
+    // one superfluous access to global memory.  However if there was an
     // if-statement [if(i < npart)] before this, there would be one superflous
-    // if statement for each single (real) particle. So as there are
-    // (hopefully) much more real than ghost particles, it makes sense to
+    // if statement for each single (real) particle.  So as there are
+    // (normally) much more real than ghost particles, it makes sense to
     // simply apply these operations to the ghost ones, too...
     //
-    // Similar situations in this file will be denoted by a `[=*=]'-symbol.
+    // Similar situations in this file will be denoted by a `[*]'-symbol.
     vector_type this_position = g_r[i];
 
-    // velocity of particle associated with this particular thread
+    // velocity of particle associated with this particular thread [*]
     vector_type_ this_velocity;
     unsigned int this_tag;
-    // [=*=]
 #ifdef USE_OSEEN_DSFUN
     tie(this_velocity, this_tag) = untagged<vector_type_>(g_v[i], g_v[i + threads_grid]);
 #else
@@ -184,29 +199,26 @@ __global__ void _compute_velocities(
     this_velocity = 0;
 
     // loop over every particle and consecutively add up velocity of this particle
-    for(unsigned int tile_offset = 0; tile_offset < GTDIM; tile_offset+=TDIM) {
+    for (unsigned int offset = 0; offset < threads_grid; offset+=WARP_SIZE) {
         // transfer positions and forces from global to shared memory
-        s_positions[TID] = g_r[tile_offset + TID];
-        s_forces[TID] = g_f[tile_offset + TID];
+        if (TID < WARP_SIZE) { // this is done by the first warp alone
+            s_positions[TID] = g_r[offset + TID];
+            s_forces[TID] = g_f[offset + TID];
+        } // else { wait for this warp }
         __syncthreads(); //IMPORTANT: sync after reading. Otherwise a thread could request information not yet stored in shared memory.
 
-        if( i < npart ) { //this could be removed [=*=]
-            // loop over threads in this tile (= block)
-            for(unsigned int k = 0; k < TDIM; ++k ) {
-                if( tile_offset+k < npart ) { //IMPORTANT: this must not be removed!
-                    // force on other particle
-                    vector_type that_force = s_forces[k];
+        // loop over all data in shared memory
+        for (unsigned int k = 0; k < WARP_SIZE; ++k ) {
+            if (offset + k < npart) { //IMPORTANT: this must not be removed!
+                // force on other particle
+                vector_type that_force = s_forces[k];
 
-                    if( i == tile_offset+k ) { // self mobility
-                        this_velocity += that_force;
-                    }
-                    else { // interaction
-                        // position of other particle
-                        vector_type that_position = s_positions[k];
-
-                        // compute interaction of `this' and `that'
-                        interaction_mobility<order>(that_position, that_force, this_position, this_velocity, box_length, radius);
-                    }
+                if (i == offset+k) { // self mobility
+                    this_velocity += that_force;
+                }
+                else { // interaction
+                    vector_type that_position = s_positions[k];
+                    interaction_mobility<order>(that_position, that_force, this_position, this_velocity, box_length, radius);
                 }
             }
         }
@@ -215,7 +227,7 @@ __global__ void _compute_velocities(
 
     this_velocity *= self_mobility; // this has been factorized in previous computations
 
-    // store final velocity for this particle [=*=]
+    // store final velocity for this particle [*]
 #ifdef USE_OSEEN_DSFUN
     tie(g_v[i], g_v[i + threads_grid]) = tagged(this_velocity, this_tag);
 #else
@@ -224,20 +236,10 @@ __global__ void _compute_velocities(
 
 }
 
-
 } // namespace oseen_kernel
 
 template <int dimension>
 oseen_wrapper<dimension> const oseen_wrapper<dimension>::wrapper = {
-    /* gpu_vector_type does not have to be passed (in < >) as it's the type of
-     * one argument and thus the compiler can identify is. On the other hand,
-     * vector_type must be passed -- even though it's in the parameter list --,
-     * because it's the first parameter and the _second_ (vector_type_) is
-     * _not_ in the parameter list and thus has to be passed explicitly.
-     *
-     * This could be changed by simply using the order vector_type_,
-     * vector_type, gpu_vector_type.
-     */
 #ifdef USE_OSEEN_DSFUN
     oseen_kernel::_compute_velocities<1, fixed_vector<float, dimension>, fixed_vector<dsfloat, dimension> > // _oseen
   , oseen_kernel::_compute_velocities<3, fixed_vector<float, dimension>, fixed_vector<dsfloat, dimension> > // _rotne

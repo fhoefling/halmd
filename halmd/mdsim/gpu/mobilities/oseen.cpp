@@ -33,11 +33,11 @@ namespace mdsim { namespace gpu { namespace mobilities
 
 template <int dimension, typename float_type>
 oseen<dimension, float_type>::oseen(
-        boost::shared_ptr<particle_type> particle
-        , boost::shared_ptr<box_type> box
-        , float radius
-        , float viscosity
-        , int order
+    boost::shared_ptr<particle_type> particle
+    , boost::shared_ptr<box_type> box
+    , float radius
+    , float viscosity
+    , int order
 )
   // dependency injection
   : particle(particle)
@@ -49,15 +49,11 @@ oseen<dimension, float_type>::oseen(
   , order_(order)
 {
     // log
-    LOG("Particle radii: a = " << radius_ ) ;
-    LOG("Dynamic viscosity of fluid: eta = " << viscosity_ ) ;
-    LOG("Order of accurancy of hydrodynamic interaction in (a/r): " << order_ ) ;
-    if( order_ <= 2 ) LOG( "Using Oseen Tensor for hydrodynamic interaction" );
-    if( order_ >= 3 ) LOG( "Using Rotne-Prager Tensor for hydrodynamic interaction" );
-
-    // store box-lengths as float-vector
-//    for(unsigned int i = 0; i < dimension; ++i)
-//        box_length_[i] = box->length()[i]; //< elementwise double->float conversion
+    LOG("Particle radii: a = " << radius_);
+    LOG("Dynamic viscosity of fluid: eta = " << viscosity_);
+    LOG("Order of accurancy of hydrodynamic interaction in (a/r): " << order_);
+    if( order_ <= 2 ) LOG( "Using Oseen Tensor for hydrodynamic interaction");
+    if( order_ >= 3 ) LOG( "Using Rotne-Prager Tensor for hydrodynamic interaction");
 }
 
 /**
@@ -68,18 +64,16 @@ void oseen<dimension, float_type>::compute_velocities()
 {
     scoped_timer<timer> timer_(runtime_.compute_velocities); // measure time 'till destruction
 
-    vector_type box_length = static_cast<vector_type>(box->length());
-
     // call kernel
     try {
         // configure cuda parameter (place this immediately before wrapper)
         cuda::configure(
             particle->dim.grid
           , particle->dim.block
-          , particle->dim.threads_per_block() * (sizeof(float4) + sizeof(typename wrapper_type::gpu_vector_type))
-          //^ allocate shared memory for position (float4) and forces (float4 [float2] for 3D [2D])
+          , WARP_SIZE * (sizeof(float4) + sizeof(typename wrapper_type::gpu_vector_type))
+          // Allocate shared memory for position (float4) and forces (float4 in 3D, float2 in 2D).
         );
-        if( order_ <= 2 ) // oseen
+        if (order_ <= 2) // oseen
             wrapper_type::wrapper.compute_velocities_oseen(
                     particle->g_r, particle->g_f, particle->g_v, particle->nbox, static_cast<vector_type>(box->length()), radius_, self_mobility_
                     );
@@ -88,6 +82,11 @@ void oseen<dimension, float_type>::compute_velocities()
                     particle->g_r, particle->g_f, particle->g_v, particle->nbox, static_cast<vector_type>(box->length()), radius_, self_mobility_
                     );
         cuda::thread::synchronize();
+
+        // Since parameters such as radius, self mobility etc. are constants, one
+        // could also store them on the GPU (cuda::symbol<>) instead of passing them
+        // as arguments.
+
     }
     catch (cuda::error const&) {
         LOG_ERROR("failed to stream computation of velocities via oseen on GPU");
@@ -95,9 +94,10 @@ void oseen<dimension, float_type>::compute_velocities()
     }
 }
 
-//! return mobility matrix -- not implemented yet
+//! Compute mobility matrix -- not implemented yet
 template <int dimension, typename float_type>
-void oseen<dimension, float_type>::compute() {
+void oseen<dimension, float_type>::compute()
+{
     scoped_timer<timer> timer_(runtime_.compute); // measure time 'till destruction
 }
 
@@ -158,6 +158,7 @@ HALMD_LUA_API int luaopen_libhalmd_mdsim_gpu_mobilities_oseen(lua_State* L)
 template class oseen<3, float>;
 template class oseen<2, float>;
 
-}}} // namespace mdsim::gpu::mobilities
-
+} // namespace mobilities
+} // namespace gpu
+} // namespace mdsim
 } // namespace halmd

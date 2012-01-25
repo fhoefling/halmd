@@ -1,5 +1,5 @@
 /*
- * Copyright © 2011  Michael Kopp
+ * Copyright © 2011-2012  Michael Kopp
  *
  * This file is part of HALMD.
  *
@@ -26,10 +26,12 @@
 #include <halmd/mdsim/type_traits.hpp>
 #include <halmd/numeric/mp/dsfloat.hpp>
 
-namespace halmd
-{
-namespace mdsim { namespace gpu { namespace mobilities
-{
+namespace halmd {
+namespace mdsim {
+namespace gpu {
+namespace mobilities {
+
+enum { WARP_SIZE = 32 };
 
 // pointer for all functions
 template <int dimension>
@@ -39,13 +41,12 @@ struct oseen_wrapper
     typedef typename type_traits<dimension, float>::gpu::coalesced_vector_type gpu_vector_type;
     cuda::function<void (const float4*, const gpu_vector_type*, float4*, const unsigned int, const vector_type, const float, const float)> compute_velocities_oseen;
     cuda::function<void (const float4*, const gpu_vector_type*, float4*, const unsigned int, const vector_type, const float, const float)> compute_velocities_rotne;
-    // cuda::symbol<> for constants (see euler_kernel.hpp)
-
     static oseen_wrapper const wrapper;
 };
 
-}}} // namespace mdsim::gpu::velocities
-
+} // namespace mobilities
+} // namespace gpu
+} // namespace mdsim
 } // namespace halmd
 
 #endif /* ! HALMD_MDSIM_GPU_MOBILITIES_OSEEN_KERNEL_HPP */

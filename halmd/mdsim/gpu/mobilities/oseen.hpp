@@ -29,7 +29,6 @@
 #include <halmd/mdsim/gpu/mobilities/oseen_kernel.hpp>
 #include <halmd/mdsim/mobility.hpp>
 #include <halmd/numeric/mp/dsfloat.hpp>
-#include <halmd/random/gpu/random.hpp> // necessary?
 #include <halmd/utility/profiler.hpp>
 
 namespace halmd {
@@ -37,6 +36,13 @@ namespace mdsim {
 namespace gpu {
 namespace mobilities {
 
+/**
+ * \brief Class to compute hydrodynamic interactions.
+ *
+ * In lowest approximation the Oseen tensor is used, in higher approximation
+ * Rotne-Prager. Currently only one particle type is supported (only one
+ * radius).
+ */
 template <int dimension, typename float_type>
 class oseen
   : public mdsim::mobility<dimension>
@@ -106,13 +112,11 @@ protected:
     float radius_;
     //! dynamic viscosity of fluid
     float viscosity_;
-    //! self mobility (1/6 pi eta a), a==radius_, eta==viscosity_
+    //! self mobility (1/(6 pi eta a)), a = radius_, eta = viscosity_
     float self_mobility_;
     //! order of accuracy of hydrodynamic interaction in (a/r)
     int order_;
-    //! store box length as float-vector here (it's passed from box as double-vector)
-    vector_type box_length_;
-    /** profiling runtime accumulators */
+    //! profiling runtime accumulators
     runtime runtime_;
 };
 
