@@ -23,6 +23,7 @@
 #include <cuda_wrapper/cuda_wrapper.hpp>
 
 #include <halmd/algorithm/gpu/transform.cuh>
+#include <halmd/mdsim/gpu/particle_kernel.cuh> // tie/tag
 
 namespace halmd {
 namespace algorithm {
@@ -52,6 +53,20 @@ struct apply_bind2nd_wrapper
 {
     cuda::function<void (coalesced_input_type const*, coalesced_output_type*, coalesced_input_type const, unsigned int)> apply;
     static apply_bind2nd_wrapper const kernel;
+};
+
+// preserve tag of first (unbound) argument
+template <
+    typename functor
+  , typename input_type
+  // , typename coalesced_input_type       = input_type  --> must be float4
+  , typename output_type                = input_type
+  // , typename coalesced_output_type      = output_type --> must be float4
+>
+struct apply_bind2nd_preserve_tag_wrapper
+{
+    cuda::function<void (float4 const*, float4*, input_type const, unsigned int)> apply_preserve_tag;
+    static apply_bind2nd_preserve_tag_wrapper const kernel;
 };
 
 } // namespace gpu

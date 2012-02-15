@@ -70,6 +70,29 @@ __global__ void bind2nd(
     }
 }
 
+template <
+    typename functor
+  , typename input_type
+  , typename output_type
+>
+__global__ void bind2nd_preserve_tag(
+    float4 const* g_in
+  , float4* g_out
+  , input_type g_bind
+  , unsigned int n
+)
+{
+    // coalesced read- and write access to global memory for suitable array types
+    for (unsigned int i = GTID; i < n; i += GTDIM) {
+        unsigned int tag;
+        input_type u;
+        tie(u, tag) = halmd::mdsim::gpu::particle_kernel::untagged<input_type>(g_in[i]);
+        input_type v(g_bind);
+        output_type w = transform<functor, input_type, output_type>(u, v);
+        g_out[i] = halmd::mdsim::gpu::particle_kernel::tagged(w, tag);
+    }
+}
+
 } // namespace apply_bind_kernel
 
 // bind function to wrapper
@@ -89,6 +112,11 @@ apply_bind1st_wrapper<BOOST_PP_ENUM_PARAMS(5, T)> const apply_bind1st_wrapper<BO
 template <BOOST_PP_ENUM_PARAMS(5, typename U)>
 apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(5, U)> const apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(5, U)>::kernel = {
     apply_bind_kernel::bind2nd<BOOST_PP_ENUM_PARAMS(5, U)>
+};
+
+template <BOOST_PP_ENUM_PARAMS(3, typename U)>
+apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(3, U)> const apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(3, U)>::kernel = {
+    apply_bind_kernel::bind2nd_preserve_tag<BOOST_PP_ENUM_PARAMS(3, U)>
 };
 
 } // namespace algorithm
