@@ -1,1 +1,2 @@
 require("halmd.mdsim.fields.constant_force")
+require("halmd.mdsim.fields.constant_velocity")

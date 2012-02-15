@@ -1,0 +1,129 @@
+--
+-- Copyright © 2012  Michael Kopp
+--
+-- This file is part of HALMD.
+--
+-- HALMD is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--
+
+require("halmd.device")
+require("halmd.mdsim.core")
+require("halmd.mdsim.particle")
+require("halmd.modules")
+
+-- grab modules
+local device = halmd.device
+local mdsim = halmd.mdsim
+-- grab C++ wrappers
+local constant_velocity_wrapper = {
+    host = {
+        [2] = libhalmd.mdsim.host.fields.constant_velocity_2_
+      , [3] = libhalmd.mdsim.host.fields.constant_velocity_3_
+    }
+}
+if libhalmd.mdsim.gpu then
+    constant_velocity_wrapper.gpu = {
+        [2] = libhalmd.mdsim.gpu.fields.constant_velocity_2_
+      , [3] = libhalmd.mdsim.gpu.fields.constant_velocity_3_
+    }
+end
+local po = libhalmd.po
+local h5 = libhalmd.h5
+-- grab standard library
+local assert = assert
+local property = property
+
+module("halmd.mdsim.fields.constant_velocity", halmd.modules.register)
+
+--
+-- construct constant_velocity module
+--
+-- @param args.value   value of constant velocity vector
+-- @param args.add     if present add velocity field, else call set()
+--
+function new(args)
+    -- dependency injection
+    local particle = mdsim.particle() -- singleton
+    local dimension = assert(particle.dimension)
+    local logger = assert(args.logger)
+
+    -- value of the external field to set/add
+    local value = assert(args.value, "a value for the external velocity field is required")
+    local use_add = args.add
+
+    -- construct module
+    local constant_velocity
+    if device() then
+        constant_velocity = assert(constant_velocity_wrapper.gpu[dimension])
+    else
+        constant_velocity = assert(constant_velocity_wrapper.host[dimension])
+    end
+    local field = constant_velocity(particle, value, logger)
+
+    -- connect field to core
+    local core = mdsim.core()
+    if use_add then
+        -- add velocity field via the same signal as velocity computation
+        core:on_append_setup{field.add, tracker = field}
+        -- Add the velocity before the integrator is called; the latter
+        -- requires a completely up to date velocity.
+        core:on_prepend_integrate{field.add, tracker = field}
+    else
+        -- set velocity field before velocity computation
+        core:on_prepend_setup{field.set, tracker = field}
+        core:on_prepend_integrate{field.set, tracker = field}
+    end
+
+    field.use_add = property(function(self)
+        return not not use_add -- convert to boolean
+    end)
+
+    return field
+end
+
+--
+-- assemble module options
+--
+-- @param desc po.options_description
+--
+function options(desc)
+    desc:add("value", po.float_array(), "external field vector")
+    desc:add("add", po.bool_switch(), "add velocity field (if switch present)")
+end
+
+--
+-- returns module description
+--
+function description()
+    return "add or set a constant velocity field"
+end
+
+--
+-- write module parameters to HDF5 group
+--
+-- @param constant_velocity module instance
+-- @param group HDF5 group
+--
+function write_parameters(constant_velocity, group)
+    group:write_attribute("value", h5.float_array(), constant_velocity.value)
+    group:write_attribute("add", h5.bool(), constant_velocity.use_add)
+end
+
+--
+-- read module parameters from HDF5 group
+--
+function read_parameters(args, group)
+    args.value = group:read_attribute("value", h5.float_array())
+    args.add = group:read_attribute("add", h5.bool())
+end
