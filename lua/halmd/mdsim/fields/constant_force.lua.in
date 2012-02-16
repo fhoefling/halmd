@@ -1,0 +1,127 @@
+--
+-- Copyright © 2012  Michael Kopp
+--
+-- This file is part of HALMD.
+--
+-- HALMD is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--
+
+require("halmd.device")
+require("halmd.mdsim.core")
+require("halmd.mdsim.particle")
+require("halmd.modules")
+
+-- grab modules
+local device = halmd.device
+local mdsim = halmd.mdsim
+-- grab C++ wrappers
+local constant_force_wrapper = {
+    host = {
+        [2] = libhalmd.mdsim.host.fields.constant_force_2_
+      , [3] = libhalmd.mdsim.host.fields.constant_force_3_
+    }
+}
+if libhalmd.mdsim.gpu then
+    constant_force_wrapper.gpu = {
+        [2] = libhalmd.mdsim.gpu.fields.constant_force_2_
+      , [3] = libhalmd.mdsim.gpu.fields.constant_force_3_
+    }
+end
+local po = libhalmd.po
+local h5 = libhalmd.h5
+-- grab standard library
+local assert = assert
+local property = property
+
+module("halmd.mdsim.fields.constant_force", halmd.modules.register)
+
+--
+-- construct constant_force module
+--
+-- @param args.value   value of constant force vector
+-- @param args.add     if present add force field, else call set()
+--
+function new(args)
+    -- dependency injection
+    local particle = mdsim.particle() -- singleton
+    local dimension = assert(particle.dimension)
+    local logger = assert(args.logger)
+
+    -- value of the external field to set/add
+    local value = assert(args.value)
+    local use_add = args.add
+
+    -- construct module
+    local constant_force
+    if device() then
+        constant_force = assert(constant_force_wrapper.gpu[dimension])
+    else
+        constant_force = assert(constant_force_wrapper.host[dimension])
+    end
+    local field = constant_force(particle, value, logger)
+
+    -- connect field to core
+    local core = mdsim.core()
+    if use_add then
+        -- add force field via the same signal as force computation
+        core:on_append_setup{field.add, tracker = field}
+        core:on_force{field.add, tracker = field}
+    else
+        -- set force field before force computation
+        core:on_prepend_setup{field.set, tracker = field}
+        core:on_prepend_force{field.set, tracker = field}
+    end
+
+    field.use_add = property(function(self)
+        return not not use_add -- convert to boolean
+    end)
+
+    return field
+end
+
+--
+-- assemble module options
+--
+-- @param desc po.options_description
+--
+function options(desc)
+    desc:add("value", po.float_array(), "external field vector")
+    desc:add("add", po.bool_switch(), "add force field if present")
+end
+
+--
+-- returns module description
+--
+function description()
+    return "add or set a constant force field"
+end
+
+--
+-- write module parameters to HDF5 group
+--
+-- @param constant_force module instance
+-- @param group HDF5 group
+--
+function write_parameters(constant_force, group)
+    group:write_attribute("value", h5.float_array(), constant_force.value)
+    group:write_attribute("add", h5.bool(), constant_force.use_add)
+end
+
+--
+-- read module parameters from HDF5 group
+--
+function read_parameters(args, group)
+    args.value = group:read_attribute("value", h5.float_array())
+    args.add = group:read_attribute("add", h5.bool())
+end

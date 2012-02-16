@@ -46,6 +46,9 @@ local function script()
     -- set initial particle velocities (optionally from reader)
     mdsim.velocity{reader = reader}
 
+    -- setup optional external field
+    mdsim.field()
+
     -- Construct sampler.
     local sampler = observables.sampler()
 

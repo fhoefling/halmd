@@ -1,0 +1,87 @@
+--
+-- Copyright © 2012  Michael Kopp
+--
+-- This file is part of HALMD.
+--
+-- HALMD is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--
+
+require("halmd.mdsim.fields")
+require("halmd.modules")
+
+-- grab modules
+local fields = halmd.mdsim.fields
+-- grab C++ wrappers
+local h5 = libhalmd.h5
+local po = libhalmd.po
+-- grab standard library
+local assert = assert
+local pairs = pairs
+local property = property
+
+module("halmd.mdsim.field", halmd.modules.register)
+
+--
+-- construct field module
+--
+function new(args)
+    local name = args.field
+    if not name then
+        return nil
+    end
+
+    field = assert(fields[name])()
+
+    -- store name of field
+    field.name = property(function(self)
+        return name
+    end)
+
+    return field
+end
+
+--
+-- assemble module options
+--
+-- @param desc po.options_description
+--
+function options(desc, globals)
+
+    -- field module choices with descriptions
+    local choices = {}
+    for field, module in pairs(fields) do
+        if module.description then
+            choices[field] = module.description()
+        end
+    end
+
+    globals:add("field", po.string():choices(choices), "select constant force or velocity field")
+end
+
+--
+-- read module parameters from HDF5 group
+--
+function read_parameters(args, group, globals)
+    args.field = globals:read_attribute("field", h5.string())
+end
+
+--
+-- write module parameters to HDF5 group
+--
+-- @param field module instance
+-- @param group HDF5 group
+--
+function write_parameters(field, group, globals)
+    globals:write_attribute("field", h5.string(), field.name)
+end
