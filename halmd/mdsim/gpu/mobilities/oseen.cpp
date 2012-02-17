@@ -26,22 +26,24 @@
 using namespace boost;
 using namespace std;
 
-namespace halmd
-{
-namespace mdsim { namespace gpu { namespace mobilities
-{
+namespace halmd {
+namespace mdsim {
+namespace gpu {
+namespace mobilities {
 
 template <int dimension, typename float_type>
 oseen<dimension, float_type>::oseen(
     boost::shared_ptr<particle_type> particle
-    , boost::shared_ptr<box_type> box
-    , float radius
-    , float viscosity
-    , int order
+  , boost::shared_ptr<box_type> box
+  , float radius
+  , float viscosity
+  , int order
+  , boost::shared_ptr<logger_type> logger
 )
   // dependency injection
   : particle(particle)
   , box(box)
+  , logger_(logger)
   // set parameters
   , radius_(radius)
   , viscosity_(viscosity)
@@ -131,11 +133,12 @@ void oseen<dimension, float_type>::luaopen(lua_State* L)
                 [
                     class_<oseen, shared_ptr<_Base>, _Base>(class_name.c_str())
                         .def(constructor<
-                           boost::shared_ptr<particle_type>
-                           , boost::shared_ptr<box_type>
-                           , float
-                           , float
-                           , int
+                            boost::shared_ptr<particle_type>
+                          , boost::shared_ptr<box_type>
+                          , float
+                          , float
+                          , int
+                          , shared_ptr<logger_type>
                          >())
                         .property("compute", &wrap_compute<oseen>)
                         .property("compute_velocities", &wrap_compute_velocities<oseen>)

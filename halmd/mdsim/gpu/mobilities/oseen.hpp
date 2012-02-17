@@ -30,6 +30,7 @@
 #include <halmd/mdsim/mobility.hpp>
 #include <halmd/numeric/mp/dsfloat.hpp>
 #include <halmd/utility/profiler.hpp>
+#include <halmd/io/logger.hpp>
 
 namespace halmd {
 namespace mdsim {
@@ -54,6 +55,7 @@ public:
     typedef typename particle_type::vector_type vector_type;
     typedef typename particle_type::gpu_vector_type gpu_vector_type;
     typedef halmd::mdsim::gpu::mobilities::oseen_wrapper<dimension> wrapper_type;
+    typedef logger logger_type;
 
     static char const* module_name() { return "oseen"; }
 
@@ -68,6 +70,7 @@ public:
       , float radius
       , float viscosity
       , int order
+      , boost::shared_ptr<logger_type> logger = boost::make_shared<logger_type>()
     );
 
     // inherited functions
@@ -99,6 +102,8 @@ public:
     }
 
 protected:
+    //! module logger
+    boost::shared_ptr<logger_type> logger_;
     typedef utility::profiler profiler_type;
     typedef typename profiler_type::accumulator_type accumulator_type;
 

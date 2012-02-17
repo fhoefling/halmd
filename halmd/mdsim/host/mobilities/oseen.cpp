@@ -44,9 +44,13 @@ oseen<dimension, float_type>::oseen(
   , float radius
   , float viscosity
   , int order
+  , boost::shared_ptr<logger_type> logger
 )
-  : particle(particle) // dependency injection
-  , box(box) // dependency injection
+  // dependency injection
+  : particle(particle)
+  , box(box)
+  , logger_(logger)
+  // module parameters
   , radius_(radius)
   , viscosity_(viscosity)
   , order_(order)
@@ -143,7 +147,14 @@ void oseen<dimension, float_type>::luaopen(lua_State* L)
                 namespace_("mobilities")
                 [
                     class_<oseen, shared_ptr<_Base>, _Base>(class_name.c_str())
-                        .def(constructor<shared_ptr<particle_type>, shared_ptr<box_type>, double, double, int>())
+                        .def(constructor<
+                            shared_ptr<particle_type>
+                          , shared_ptr<box_type>
+                          , double
+                          , double
+                          , int
+                          , shared_ptr<logger_type>
+                        >())
                         .property("radius", &oseen::radius)
                         .property("viscosity", &oseen::viscosity)
                         .property("order", &oseen::order)

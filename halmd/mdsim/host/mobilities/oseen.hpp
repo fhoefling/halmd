@@ -43,6 +43,7 @@ public:
     typedef host::particle<dimension, float_type> particle_type;
     typedef typename particle_type::vector_type vector_type;
     typedef typename mdsim::box<dimension> box_type;
+    typedef logger logger_type;
 
     static char const* module_name() { return "oseen"; }
 
@@ -64,6 +65,7 @@ public:
       , float radius //FIXME List of radii for different particles?
       , float viscosity
       , int order
+      , boost::shared_ptr<logger_type> logger = boost::make_shared<logger_type>()
     );
 
     // inherited functions
@@ -93,6 +95,8 @@ public:
     }
 
 private:
+    /** module logger */
+    boost::shared_ptr<logger_type> logger_;
     typedef utility::profiler profiler_type;
     typedef typename profiler_type::accumulator_type accumulator_type;
 

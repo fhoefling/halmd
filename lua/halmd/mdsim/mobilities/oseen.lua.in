@@ -94,7 +94,7 @@ function new(args)
         oseen = assert(oseen_wrapper.host[dimension], "error selecting oseen host module")
         constant_velocity = assert(constant_velocity_wrapper.host[dimension], "error selecting constant_velocity gpu module for oseen module")
     end
-    local mobility = oseen(particle, box, radius, viscosity, order) -- call constructor
+    local mobility = oseen(particle, box, radius, viscosity, order, logger) -- call constructor
     local field = constant_velocity(particle, zerofield, logger)
 
     -- connect signals to core
