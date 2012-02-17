@@ -35,21 +35,22 @@ namespace fields {
 template <int dimension, typename float_type>
 constant_force<dimension, float_type>::constant_force(
     shared_ptr<particle_type> particle
-  , vector_type f_ext
+  , vector_type value
   , boost::shared_ptr<logger_type> logger
 )
     // dependency injection
   : particle(particle)
   , logger_(logger)
     // set parameters
-  , f_ext_(f_ext)
+  , value_(value)
 {
     zero_ = true;
     for (int i = 0; i < dimension; ++i) {
-        if (f_ext_[i] != 0) {
+        if (value_[i] != 0) {
             zero_ = false;
         }
     }
+    LOG("module initialized with constant force field" << value);
 }
 
 template <int dimension, typename float_type>
@@ -62,7 +63,7 @@ void constant_force<dimension, float_type>::add()
         LOG_TRACE("Add constant force to particle forces.");
         transform(
             particle->f.begin(), particle->f.end(), particle->f.begin()
-          , std::bind1st(plus<vector_type>(), f_ext_)
+          , std::bind1st(plus<vector_type>(), value_)
         );
     }
 }
@@ -71,8 +72,8 @@ template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::set()
 {
     LOG_TRACE("set particle fields to constant_force force");
-    fill(particle->f.begin(), particle->f.end(), f_ext_);
-    // The usage of memset(..,0,..) (for the case f_ext_==0)
+    fill(particle->f.begin(), particle->f.end(), value_);
+    // The usage of memset(..,0,..) (for the case value_==0)
     // might be dangerous, as particle->f is a vector of fixed
     // vectors. It's not guaranteed, that overwriting all bytes
     // of these with `0' is equivalent to setting them to a

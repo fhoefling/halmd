@@ -48,7 +48,7 @@ constant_force<dimension, float_type>::constant_force(
         // zero_ = zero_ and value_.z == 0;
         zero_ = zero_ and value[2] == 0;
     }
-    LOG("module initialized with field " << value);
+    LOG("module initialized with constant force field " << value);
 }
 
 template <int dimension, typename float_type>

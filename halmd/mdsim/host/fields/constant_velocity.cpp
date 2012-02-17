@@ -51,6 +51,7 @@ constant_velocity<dimension, float_type>::constant_velocity(
             break;
         }
     }
+    LOG("module initialized with constant force field" << value);
 }
 
 template <int dimension, typename float_type>
