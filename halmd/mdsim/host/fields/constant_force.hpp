@@ -50,11 +50,11 @@ public:
 
     /**
      * @param particle host::particle instance.
-     * @param f_ext external force field to add/set
+     * @param value external force field to add/set
      */
     constant_force(
         boost::shared_ptr<particle_type> particle
-      , vector_type f_ext
+      , vector_type value
       , boost::shared_ptr<logger_type> logger = boost::make_shared<logger_type>()
     );
 
@@ -67,14 +67,14 @@ public:
     //! return constant force
     vector_type value() const
     {
-        return f_ext_;
+        return value_;
     }
 
 private:
     /** module logger */
     boost::shared_ptr<logger_type> logger_;
     //! The external force field.
-    vector_type f_ext_;
+    vector_type value_;
     //! Check whether the field to add/set is zero.
     bool zero_;
 };

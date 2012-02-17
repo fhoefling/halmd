@@ -50,7 +50,7 @@ constant_velocity<dimension, float_type>::constant_velocity(
             zero_ = false;
             break;
         }
-    LOG("module initialized with field " << value_);
+    LOG("module initialized with constant velocity field " << value_);
 }
 
 template <int dimension, typename float_type>
