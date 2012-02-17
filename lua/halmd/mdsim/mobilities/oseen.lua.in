@@ -21,6 +21,7 @@ require("halmd.modules")
 
 require("halmd.device")
 require("halmd.mdsim.core")
+require("halmd.mdsim.particle")
 
 
 
@@ -40,11 +41,25 @@ if libhalmd.mdsim.gpu then
       , [3] = libhalmd.mdsim.gpu.mobilities.oseen_3_
     }
 end
+-- oseen uses constant_velocity to set all velocities to zero
+local constant_velocity_wrapper = {
+    host = {
+        [2] = libhalmd.mdsim.host.fields.constant_velocity_2_
+      , [3] = libhalmd.mdsim.host.fields.constant_velocity_3_
+    }
+}
+if libhalmd.mdsim.gpu then
+    constant_velocity_wrapper.gpu = {
+        [2] = libhalmd.mdsim.gpu.fields.constant_velocity_2_
+      , [3] = libhalmd.mdsim.gpu.fields.constant_velocity_3_
+    }
+end
 -- to import from comamndline / HF5 files:
 local h5 = libhalmd.h5
 local po = libhalmd.po
 -- grab standard library
 local assert = assert
+local table = table
 
 
 module("halmd.mdsim.mobilities.oseen", halmd.modules.register)
@@ -60,21 +75,36 @@ function new(args)
     local radius = args.radius or 1 -- default value
     local order = args.order or 3 -- default value (Rotne Prager)
 
-    local core = mdsim.core()
-    local dimension = assert(core.dimension)
-    local particle = assert(core.particle)
-    local box = assert(core.box)
+    local particle = assert(mdsim.particle()) -- singleton
+    local dimension = assert(particle.dimension)
+    local box = assert(mdsim.box()) -- singleton
+    local logger = assert(args.logger)
+
+    -- parameters for velocity_field
+    -- A zero-vector of appropriate dimension is to set.
+    zerofield = {0, 0}
+    if dimension == 3 then table.insert(zerofield, 0) end
 
     local oseen
+    local constant_velocity
     if device() then -- decide which implementation gpu/cpu to use
-        oseen = assert(oseen_wrapper.gpu[dimension])
+        oseen = assert(oseen_wrapper.gpu[dimension], "error selecting oseen gpu module")
+        constant_velocity = assert(constant_velocity_wrapper.gpu[dimension], "error selecting constant_velocity gpu module for oseen module")
     else
-        oseen = assert(oseen_wrapper.host[dimension])
+        oseen = assert(oseen_wrapper.host[dimension], "error selecting oseen host module")
+        constant_velocity = assert(constant_velocity_wrapper.host[dimension], "error selecting constant_velocity gpu module for oseen module")
     end
     local mobility = oseen(particle, box, radius, viscosity, order) -- call constructor
+    local field = constant_velocity(particle, zerofield, logger)
 
     -- connect signals to core
     local core = mdsim.core()
+    -- FIXME: fiels.set must be called before mobility!  Unfortunately
+    -- on_prepend_integrate is the first slot.  Does it suffice to connect it
+    -- before mobility?
+    -- Use tracker mobility for field as well, since when the mobility is not
+    -- needed any more, the field won't be, too.
+    core:on_prepend_integrate{field.set, tracker = mobility}
     core:on_prepend_integrate{mobility.compute_velocities, tracker = mobility}
 
     return mobility
@@ -102,7 +132,7 @@ end
 --
 function options(desc)
     desc:add("viscosity" , po.float() , "dynamic viscosity of medium")
-    desc:add("radius" , po.float() , "hydrodynamic radius of particle (only one for all particles possible)")
+    desc:add("radius" , po.float() , "hydrodynamic radius of all particles")
     desc:add("order" , po.float() , "order of accuracy of hydrodynamic interactions")
 end
 

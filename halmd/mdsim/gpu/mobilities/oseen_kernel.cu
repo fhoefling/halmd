@@ -192,12 +192,6 @@ __global__ void _compute_velocities(
 #else
     tie(this_velocity, this_tag) = untagged<vector_type_>(g_v[i]);
 #endif
-    // reset velocity to zero //TODO this must be moved to a particle member function
-    // Since we're in an overdamped regime, the velocity should consist solely
-    // of external velocities (a `global' velocity). The velocity from the
-    // previous timestep must not enter here.
-    this_velocity = 0;
-
     // loop over every particle and consecutively add up velocity of this particle
     for (unsigned int offset = 0; offset < threads_grid; offset+=WARP_SIZE) {
         // transfer positions and forces from global to shared memory

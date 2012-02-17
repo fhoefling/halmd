@@ -101,11 +101,19 @@ void oseen<dimension, float_type>::compute()
     scoped_timer<timer> timer_(runtime_.compute); // measure time 'till destruction
 }
 
-
-template <int dimension, typename float_type>
-static char const* module_name_wrapper(oseen<dimension, float_type> const&)
+// Wrapper to connect set with slots.
+template <typename mobility_type>
+typename signal<void ()>::slot_function_type
+wrap_compute(shared_ptr<mobility_type> self)
 {
-    return oseen<dimension, float_type>::module_name();
+    return bind(&mobility_type::compute, self);
+}
+
+template <typename mobility_type>
+typename signal<void ()>::slot_function_type
+wrap_compute_velocities(shared_ptr<mobility_type> self)
+{
+    return bind(&mobility_type::compute_velocities, self);
 }
 
 template <int dimension, typename float_type>
@@ -129,11 +137,12 @@ void oseen<dimension, float_type>::luaopen(lua_State* L)
                            , float
                            , int
                          >())
+                        .property("compute", &wrap_compute<oseen>)
+                        .property("compute_velocities", &wrap_compute_velocities<oseen>)
                         .property("radius", &oseen::radius)
                         .property("viscosity", &oseen::viscosity)
                         .property("order", &oseen::order)
                         .property("self_mobility", &oseen::self_mobility)
-                        .property("module_name", &module_name_wrapper<dimension, float_type>)
                         .scope
                         [
                             class_<runtime>("runtime")

@@ -75,12 +75,6 @@ void oseen<dimension, float_type>::compute_velocities()
 {
     scoped_timer<timer> timer_(runtime_.compute_velocities); // measure time 'till destruction
 
-    // set all velocities to zero  //TODO this must be moved to a particle member function
-    // Since we're in an overdamped regime, the velocity should consist solely
-    // of external velocities (a `global' velocity). The velocity from the
-    // previous timestpe must not enter here.
-    fill(particle->v.begin(), particle->v.end(), 0);
-
     for(unsigned int i = 0; i < particle->nbox; ++i)
     {
         // self mobility
