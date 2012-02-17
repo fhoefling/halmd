@@ -20,8 +20,6 @@
 #ifndef HALMD_MDSIM_GPU_MOBILITIES_OSEEN_KERNEL_HPP
 #define HALMD_MDSIM_GPU_MOBILITIES_OSEEN_KERNEL_HPP
 
-#include <boost/mpl/if.hpp> //TODO necessary?
-
 #include <cuda_wrapper/cuda_wrapper.hpp>
 #include <halmd/mdsim/type_traits.hpp>
 #include <halmd/numeric/mp/dsfloat.hpp>
@@ -33,7 +31,6 @@ namespace mobilities {
 
 enum { WARP_SIZE = 32 };
 
-// pointer for all functions
 template <int dimension>
 struct oseen_wrapper
 {

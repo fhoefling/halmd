@@ -86,13 +86,21 @@ __device__ void interaction_mobility(
 
 
 /**
-  * update velocities from positions using oseen tensor calculus
+  * \brief update velocities from positions using oseen tensor calculus
   *
   * Every thread computes velocity of one single (associated) particle;
   * thread GTID is responsible for which one (g_v[GTID]).
   *
-  * Positions and velocities are computed in single-precision, only for the
-  * summing-up of velocities dsfun-precision is used.
+  * The variable USE_OSEEN_DSFUN controls, whether the
+  * computations internally are performed with single (if
+  * not defined) or double (if defined) precision.  The velocity
+  * is summed up from contributions from each particle --
+  * USE_OSEEN_DSFUN controls, to which precision this sum is
+  * evaluated.  The variable USE_VERLET_DSFUN on the other hand
+  * controls, to what precision the velocities are stored.  Even
+  * if it's not set (so velocities are stored in single
+  * precision) it makes sense, to sum up the velocity in double
+  * precision, and then store this sum in single precision.
   *
   * @param g_r positions in global device momory
   * @param g_f forces in global device momory
@@ -137,8 +145,8 @@ __device__ void interaction_mobility(
   */
 template<
     int order
-  , typename vector_type      // necessary for tagging/untagging stuff
-  , typename vector_type_     // dsfun
+  , typename vector_type      // float-vector
+  , typename vector_type_     // dsfun-vector
   , typename gpu_vector_type  // forces: gpu::vector<gpu_vector_type> (float4 in 3D, float2 in 2d)
 >
 __global__ void _compute_velocities(
@@ -188,10 +196,17 @@ __global__ void _compute_velocities(
     vector_type_ this_velocity;
     unsigned int this_tag;
 #ifdef USE_OSEEN_DSFUN
+#ifdef USE_VERLET_DSFUN
     tie(this_velocity, this_tag) = untagged<vector_type_>(g_v[i], g_v[i + threads_grid]);
-#else
+#else // ! USE_VERLET_DSFUN
+    // vector_type_ is dsfun, but velocities are stored only in single precision.
+    // Read zeros for all high precision bits.
+    float4 _zero = {0, 0, 0, 0};
+    tie(this_velocity, this_tag) = untagged<vector_type_>(g_v[i], _zero);
+#endif // end USE_VERLET_DSFUN
+#else // ! USE_OSEEN_DSFUN
     tie(this_velocity, this_tag) = untagged<vector_type_>(g_v[i]);
-#endif
+#endif // end USE_OSEEN_DSFUN
     // loop over every particle and consecutively add up velocity of this particle
     for (unsigned int offset = 0; offset < threads_grid; offset+=WARP_SIZE) {
         // transfer positions and forces from global to shared memory
@@ -223,10 +238,16 @@ __global__ void _compute_velocities(
 
     // store final velocity for this particle [*]
 #ifdef USE_OSEEN_DSFUN
+#ifdef USE_VERLET_DSFUN
     tie(g_v[i], g_v[i + threads_grid]) = tagged(this_velocity, this_tag);
-#else
+#else // ! USE_VERLET_DSFUN
+    // store velocity only in single precision
+    // _zero is defined above and is overwritten...
+    tie(g_v[i], _zero) = tagged(this_velocity, this_tag);
+#endif // end USE_VERLET_DSFUN
+#else // ! USE_OSEEN_DSFUN
     g_v[i] = tagged(this_velocity, this_tag);
-#endif
+#endif // end USE_OSEEN_DSFUN
 
 }
 
