@@ -115,7 +115,6 @@ void oseen<dimension, float_type>::compute_velocities()
         }
         particle->v[i] *= self_mobility_; //< this has been factorized in previous computations
     }
-
 }
 
 //! compute oseen tensor -- NOT YET IMPLEMENTED
@@ -130,6 +129,21 @@ template <int dimension, typename float_type>
 static char const* module_name_wrapper(oseen<dimension, float_type> const&)
 {
     return oseen<dimension, float_type>::module_name();
+}
+
+// Wrappers expose signal-functions which can passed to a signal.
+template <typename mobility_type>
+typename signal<void ()>::slot_function_type
+wrap_compute(shared_ptr<mobility_type> self)
+{
+    return bind(&mobility_type::compute, self);
+}
+
+template <typename mobility_type>
+typename signal<void ()>::slot_function_type
+wrap_compute_velocities(shared_ptr<mobility_type> self)
+{
+    return bind(&mobility_type::compute_velocities, self);
 }
 
 //! register class in luabind
@@ -160,6 +174,8 @@ void oseen<dimension, float_type>::luaopen(lua_State* L)
                         .property("order", &oseen::order)
                         // .property("self_mobility", &oseen::self_mobility)
                         .property("module_name", &module_name_wrapper<dimension, float_type>)
+                        .property("compute", &wrap_compute<oseen>)
+                        .property("compute_velocities", &wrap_compute_velocities<oseen>)
                         // register runtime accumulators
                         .scope
                         [
