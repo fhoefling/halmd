@@ -79,6 +79,12 @@ public:
         return value_;
     }
 
+    // Don't use a reference, as this should be called from lua.
+    void set_value(vector_type const value)
+    {
+        value_ = value;
+    }
+
 private:
     //! particle instance
     boost::shared_ptr<particle_type> particle_;

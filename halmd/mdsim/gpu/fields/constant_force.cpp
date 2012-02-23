@@ -135,7 +135,8 @@ void constant_force<dimension, float_type>::luaopen(lua_State* L)
                          >())
                     .property("add", &wrap_add<constant_force>)
                     .property("set", &wrap_set<constant_force>)
-                    .property("value", &constant_force::value)
+                    // the second function is exposed to lua as setter value()
+                    .property("value", &constant_force::value, &constant_force::set_value)
                 ]
             ]
         ]

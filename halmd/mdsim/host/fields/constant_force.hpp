@@ -70,6 +70,12 @@ public:
         return value_;
     }
 
+    //! set new value for constant field
+    void set_value(vector_type const value)
+    {
+        value_ = value;
+    }
+
 private:
     /** module logger */
     boost::shared_ptr<logger_type> logger_;

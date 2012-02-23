@@ -145,7 +145,8 @@ void constant_velocity<dimension, float_type>::luaopen(lua_State* L)
                          >())
                     .property("add", &wrap_add<constant_velocity>)
                     .property("set", &wrap_set<constant_velocity>)
-                    .property("value", &constant_velocity::value)
+                    // the second function is exposed to lua as setter value()
+                    .property("value", &constant_velocity::value, &constant_velocity::set_value)
                 ]
             ]
         ]
