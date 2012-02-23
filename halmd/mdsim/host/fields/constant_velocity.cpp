@@ -73,7 +73,7 @@ template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::set()
 {
     LOG_TRACE("set particle fields to constant_velocity velocity");
-    fill(particle->f.begin(), particle->f.end(), value_);
+    fill(particle->v.begin(), particle->v.end(), value_);
     // The usage of memset(..,0,..) (for the case value_==0)
     // might be dangerous, as particle->f is a vector of fixed
     // vectors. It's not guaranteed, that overwriting all bytes
