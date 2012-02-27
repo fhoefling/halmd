@@ -45,6 +45,8 @@ local function script()
     mdsim.position{reader = reader}
     -- set initial particle velocities (optionally from reader)
     mdsim.velocity{reader = reader}
+    -- setup mobility module
+    mdsim.mobility()
 
     -- Construct sampler.
     local sampler = observables.sampler()

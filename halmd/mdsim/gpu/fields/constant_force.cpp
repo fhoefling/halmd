@@ -1,0 +1,156 @@
+/*
+ * Copyright © 2012  Michael Kopp and Felix Höfling
+ *
+ * This file is part of HALMD.
+ *
+ * HALMD is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <halmd/mdsim/gpu/fields/constant_force.hpp>
+
+#include <halmd/algorithm/gpu/apply_bind_kernel.hpp>
+
+#include <halmd/utility/lua/lua.hpp>
+
+using namespace boost;
+using namespace std;
+
+namespace halmd {
+namespace mdsim {
+namespace gpu {
+namespace fields {
+
+template <int dimension, typename float_type>
+constant_force<dimension, float_type>::constant_force(
+    boost::shared_ptr<particle_type> particle
+  , vector_type value
+  , boost::shared_ptr<logger_type> logger
+)
+    // dependency injection
+  : particle_(particle)
+  , logger_(logger)
+    // parameters
+  , value_(value)
+  , is_zero_(value_ == vector_type(0))
+{
+    LOG("apply constant force field: " << value_);
+}
+
+template <int dimension, typename float_type>
+void constant_force<dimension, float_type>::set()
+{
+    LOG_TRACE("set constant force field: " << value_);
+
+    if (is_zero_) {
+        try {
+            cuda::memset(particle_->g_f, 0, particle_->g_f.capacity());
+        }
+        catch (cuda::error const&) {
+            LOG_ERROR("failed to set all forces to zero");
+            throw;
+        }
+    }
+    else {
+        try{
+            cuda::configure(particle_->dim.grid, particle_->dim.block);
+            fill_wrapper::kernel.fill(particle_->g_f, value_, particle_->nbox);
+            cuda::thread::synchronize();
+        }
+        catch (cuda::error const&) {
+            LOG_ERROR("failed to set forces");
+            throw;
+        }
+    }
+}
+
+template <int dimension, typename float_type>
+void constant_force<dimension, float_type>::add()
+{
+    LOG_TRACE("add constant force field: " << value_);
+
+    if (is_zero_) {
+        LOG_ONCE("addition of a zero force field requested");
+    }
+    else {
+        try {
+            cuda::configure(particle_->dim.grid, particle_->dim.block);
+            add_wrapper::kernel.apply(particle_->g_f, particle_->g_f, value_, particle_->nbox);
+            cuda::thread::synchronize();
+        }
+        catch (cuda::error const&) {
+            LOG_ERROR("failed to add external force field");
+            throw;
+        }
+    }
+}
+
+// Wrapper to connect set with slots.
+template <typename constant_force_type>
+typename signal<void ()>::slot_function_type
+wrap_set(shared_ptr<constant_force_type> self)
+{
+    return bind(&constant_force_type::set, self);
+}
+
+template <typename constant_force_type>
+typename signal<void ()>::slot_function_type
+wrap_add(shared_ptr<constant_force_type> self)
+{
+    return bind(&constant_force_type::add, self);
+}
+
+template <int dimension, typename float_type>
+void constant_force<dimension, float_type>::luaopen(lua_State* L)
+{
+    using namespace luabind;
+    static string class_name("constant_force_" + lexical_cast<string>(dimension) + "_");
+    module(L, "libhalmd")
+    [
+        namespace_("mdsim")
+        [
+            namespace_("gpu")
+            [
+                namespace_("fields")
+                [
+                    class_<constant_force>(class_name.c_str())
+                        .def(constructor<
+                            shared_ptr<particle_type>
+                          , vector_type
+                          , shared_ptr<logger_type>
+                         >())
+                    .property("add", &wrap_add<constant_force>)
+                    .property("set", &wrap_set<constant_force>)
+                    // the second function is exposed to lua as setter value()
+                    .property("value", &constant_force::value, &constant_force::set_value)
+                ]
+            ]
+        ]
+    ];
+}
+
+HALMD_LUA_API int luaopen_libhalmd_mdsim_gpu_fields_constant_force(lua_State* L)
+{
+    constant_force<3, float>::luaopen(L);
+    constant_force<2, float>::luaopen(L);
+    return 0;
+}
+
+// explicite instantiation
+template class constant_force<3, float>;
+template class constant_force<2, float>;
+
+} // namespace fields
+} // namespace gpu
+} // namespace mdsim
+} // namespace halmd

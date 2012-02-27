@@ -1,5 +1,5 @@
 /*
- * Copyright © 2008-2011  Peter Colberg, Felix Höfling, and Michael Kopp
+ * Copyright © 2008-2011  Peter Colberg, Felix Höfling and Michael Kopp
  *
  * This file is part of HALMD.
  *
@@ -46,6 +46,7 @@ struct sum_;
 struct complex_sum_;
 struct quaternion_sum_;
 struct max_;
+struct setequal_;
 struct accumulate_;
 
 /**
@@ -112,6 +113,15 @@ transform(T& acc, T&, T const& acc_, T const&)
  * binary transformations
  */
 template <typename transform_, typename T>
+__device__ typename enable_if<is_same<transform_, sum_>, T>::type
+transform(T v1, T v2)
+{
+    return v1 + v2;
+}
+
+// sum with two (identical) template parameters (to use with apply_bind...)
+template <typename transform_, typename T, typename T1>
+// __device__ typename enable_if<is_same<transform_, sum_>, enable_if<is_same<T, T1>, T> >::type
 __device__ typename enable_if<is_same<transform_, sum_>, T>::type
 transform(T v1, T v2)
 {

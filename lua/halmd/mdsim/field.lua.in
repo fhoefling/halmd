@@ -1,5 +1,5 @@
 --
--- Copyright © 2010-2011  Peter Colberg and Felix Höfling
+-- Copyright © 2012  Michael Kopp
 --
 -- This file is part of HALMD.
 --
@@ -17,12 +17,11 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --
 
-require("halmd.mdsim.forces")
+require("halmd.mdsim.fields")
 require("halmd.modules")
 
 -- grab modules
-local mdsim = halmd.mdsim
-local forces = halmd.mdsim.forces
+local fields = halmd.mdsim.fields
 -- grab C++ wrappers
 local h5 = libhalmd.h5
 local po = libhalmd.po
@@ -31,17 +30,27 @@ local assert = assert
 local pairs = pairs
 local property = property
 
-module("halmd.mdsim.force", halmd.modules.register)
+module("halmd.mdsim.field", halmd.modules.register)
 
 --
--- construct force module
+-- construct field module
 --
 function new(args)
-    -- initialise forces in each MD step
-    mdsim.fields.constant_force{set_flag = true}
+    local name = args.field
+    if not name then
+        return nil
+    end
 
-    local force = args.force or "pair_trunc" -- default value
-    return assert(forces[force])()
+    -- construct actual field
+    -- pass the moudule set_force_field down
+    field = assert(fields[name])({set_force_field = args.set_force_field})
+
+    -- store name of field
+    field.name = property(function(self)
+        return name
+    end)
+
+    return field
 end
 
 --
@@ -51,30 +60,30 @@ end
 --
 function options(desc, globals)
 
-    -- force module choices with descriptions
+    -- field module choices with descriptions
     local choices = {}
-    for name, module in pairs(forces) do
+    for field, module in pairs(fields) do
         if module.description then
-            choices[name] = module.description()
+            choices[field] = module.description()
         end
     end
 
-    globals:add("force", po.string():choices(choices), "select force algorithm")
+    globals:add("field", po.string():choices(choices), "select constant force or velocity field")
 end
 
 --
 -- read module parameters from HDF5 group
 --
 function read_parameters(args, group, globals)
-    args.force = globals:read_attribute("force", h5.string())
+    args.field = globals:read_attribute("field", h5.string())
 end
 
 --
 -- write module parameters to HDF5 group
 --
--- @param force module instance
+-- @param field module instance
 -- @param group HDF5 group
 --
-function write_parameters(force, group, globals)
-    globals:write_attribute("force", h5.string(), force.module.namespace)
+function write_parameters(field, group, globals)
+    globals:write_attribute("field", h5.string(), field.name)
 end

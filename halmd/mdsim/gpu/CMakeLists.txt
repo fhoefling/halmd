@@ -19,8 +19,10 @@ halmd_add_modules(
   libhalmd_mdsim_gpu_velocity
 )
 
+add_subdirectory(fields)
 add_subdirectory(forces)
 add_subdirectory(integrators)
+add_subdirectory(mobilities)
 add_subdirectory(neighbours)
 add_subdirectory(positions)
 add_subdirectory(potentials)

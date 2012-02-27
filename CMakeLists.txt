@@ -186,6 +186,12 @@ if(WITH_CUDA)
     add_definitions(-DUSE_VERLET_DSFUN)
   endif(HALMD_VARIANT_VERLET_DSFUN)
 
+  set(HALMD_VARIANT_OSEEN_DSFUN TRUE CACHE BOOL
+    "Use double-single precision functions in Oseen mobility module")
+  if(HALMD_VARIANT_OSEEN_DSFUN)
+    add_definitions(-DUSE_OSEEN_DSFUN)
+  endif(HALMD_VARIANT_OSEEN_DSFUN)
+
   set(HALMD_DEVICE_SCALE "3" CACHE STRING
     "Scale/size of the CUDA device (try to reduce in case of insufficient resources)")
   add_definitions(-DDEVICE_SCALE=${HALMD_DEVICE_SCALE})
