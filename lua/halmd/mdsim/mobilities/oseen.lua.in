@@ -77,7 +77,7 @@ function new(args)
 
     -- connect signals to core
     local core = mdsim.core()
-    core:on_prepend_integrate{mobility.compute_velocities, tracker = mobility}
+    core:on_finalize{mobility.compute_velocities, tracker = mobility}
 
     return mobility
 end
