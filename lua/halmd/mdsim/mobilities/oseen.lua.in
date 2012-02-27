@@ -41,19 +41,6 @@ if libhalmd.mdsim.gpu then
       , [3] = libhalmd.mdsim.gpu.mobilities.oseen_3_
     }
 end
--- oseen uses constant_velocity to set all velocities to zero
-local constant_velocity_wrapper = {
-    host = {
-        [2] = libhalmd.mdsim.host.fields.constant_velocity_2_
-      , [3] = libhalmd.mdsim.host.fields.constant_velocity_3_
-    }
-}
-if libhalmd.mdsim.gpu then
-    constant_velocity_wrapper.gpu = {
-        [2] = libhalmd.mdsim.gpu.fields.constant_velocity_2_
-      , [3] = libhalmd.mdsim.gpu.fields.constant_velocity_3_
-    }
-end
 -- to import from comamndline / HF5 files:
 local h5 = libhalmd.h5
 local po = libhalmd.po
@@ -80,31 +67,16 @@ function new(args)
     local box = assert(mdsim.box()) -- singleton
     local logger = assert(args.logger)
 
-    -- parameters for velocity_field
-    -- A zero-vector of appropriate dimension is to set.
-    zerofield = {0, 0}
-    if dimension == 3 then table.insert(zerofield, 0) end
-
     local oseen
-    local constant_velocity
     if device() then -- decide which implementation gpu/cpu to use
         oseen = assert(oseen_wrapper.gpu[dimension], "error selecting oseen gpu module")
-        constant_velocity = assert(constant_velocity_wrapper.gpu[dimension], "error selecting constant_velocity gpu module for oseen module")
     else
         oseen = assert(oseen_wrapper.host[dimension], "error selecting oseen host module")
-        constant_velocity = assert(constant_velocity_wrapper.host[dimension], "error selecting constant_velocity gpu module for oseen module")
     end
     local mobility = oseen(particle, box, radius, viscosity, order, logger) -- call constructor
-    local field = constant_velocity(particle, zerofield, logger)
 
     -- connect signals to core
     local core = mdsim.core()
-    -- FIXME: fiels.set must be called before mobility!  Unfortunately
-    -- on_prepend_integrate is the first slot.  Does it suffice to connect it
-    -- before mobility?
-    -- Use tracker mobility for field as well, since when the mobility is not
-    -- needed any more, the field won't be, too.
-    core:on_prepend_integrate{field.set, tracker = mobility}
     core:on_prepend_integrate{mobility.compute_velocities, tracker = mobility}
 
     return mobility

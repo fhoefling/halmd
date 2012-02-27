@@ -37,11 +37,14 @@ module("halmd.mdsim.mobility", halmd.modules.register)
 -- construct mobility module
 --
 function new(args)
+    -- If mobility module not explicitely required by commandline/config file don't use one.
     if not args.mobility
     then
         return nil
     end
-    -- If mobility module not explicitely required by commandline/config file don't use one.
+
+    -- initialise velocities in each MD step
+    mdsim.fields.constant_velocity{set_flag = true}
 
     local name = args.mobility
     local mobility = assert(mdsim.mobilities[name] , "error while selecting mobility module!")() -- select module and construct it
