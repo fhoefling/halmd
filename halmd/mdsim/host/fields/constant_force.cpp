@@ -17,9 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <algorithm>    // transform
+#include <algorithm>    // transform, fill
 #include <functional>   // plus, bind1st
-#include <string>       // fill
+#include <string>
 
 #include <halmd/mdsim/host/fields/constant_force.hpp>
 #include <halmd/utility/lua/lua.hpp>
@@ -44,40 +44,26 @@ constant_force<dimension, float_type>::constant_force(
     // set parameters
   , value_(value)
 {
-    zero_ = true;
-    for (int i = 0; i < dimension; ++i) {
-        if (value_[i] != 0) {
-            zero_ = false;
-        }
-    }
-    LOG("module initialized with constant force field" << value);
+    LOG("apply constant force field: " << value_);
 }
 
 template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::add()
 {
-    if (zero_) {
-        LOG_ONCE("Addition of a zero force field was requested.");
-    }
-    else {
-        LOG_TRACE("Add constant force to particle forces.");
-        transform(
-            particle->f.begin(), particle->f.end(), particle->f.begin()
-          , std::bind1st(plus<vector_type>(), value_)
-        );
-    }
+    LOG_TRACE("add constant force field: " << value_);
+
+    transform(
+        particle->f.begin(), particle->f.end(), particle->f.begin()
+      , std::bind1st(plus<vector_type>(), value_)
+    );
 }
 
 template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::set()
 {
-    LOG_TRACE("set particle fields to constant_force force");
+    LOG_TRACE("set constant force field: " << value_);
+
     fill(particle->f.begin(), particle->f.end(), value_);
-    // The usage of memset(..,0,..) (for the case value_==0)
-    // might be dangerous, as particle->f is a vector of fixed
-    // vectors. It's not guaranteed, that overwriting all bytes
-    // of these with `0' is equivalent to setting them to a
-    // 0-vector.
 }
 
 // Wrappers expose signal-functions which can passed to a signal.

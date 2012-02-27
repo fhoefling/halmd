@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -23,7 +23,6 @@
 #include <cuda_wrapper/cuda_wrapper.hpp>
 
 #include <halmd/algorithm/gpu/transform.cuh>
-#include <halmd/mdsim/gpu/particle_kernel.cuh> // tie/tag
 
 namespace halmd {
 namespace algorithm {
@@ -35,10 +34,11 @@ template <
   , typename coalesced_input_type       = input_type
   , typename output_type                = input_type
   , typename coalesced_output_type      = output_type
+  , typename value_type                 = input_type
 >
 struct apply_bind1st_wrapper
 {
-    cuda::function<void (coalesced_input_type const*, coalesced_output_type*, coalesced_input_type const, unsigned int)> apply;
+    cuda::function<void (coalesced_input_type const*, coalesced_output_type*, value_type, unsigned int)> apply;
     static apply_bind1st_wrapper const kernel;
 };
 
@@ -48,10 +48,11 @@ template <
   , typename coalesced_input_type       = input_type
   , typename output_type                = input_type
   , typename coalesced_output_type      = output_type
+  , typename value_type                 = input_type
 >
 struct apply_bind2nd_wrapper
 {
-    cuda::function<void (coalesced_input_type const*, coalesced_output_type*, coalesced_input_type const, unsigned int)> apply;
+    cuda::function<void (coalesced_input_type const*, coalesced_output_type*, value_type, unsigned int)> apply;
     static apply_bind2nd_wrapper const kernel;
 };
 
@@ -59,13 +60,12 @@ struct apply_bind2nd_wrapper
 template <
     typename functor
   , typename input_type
-  // , typename coalesced_input_type       = input_type  --> must be float4
   , typename output_type                = input_type
-  // , typename coalesced_output_type      = output_type --> must be float4
+  , typename value_type                 = input_type
 >
 struct apply_bind2nd_preserve_tag_wrapper
 {
-    cuda::function<void (float4 const*, float4*, input_type const, unsigned int)> apply_preserve_tag;
+    cuda::function<void (float4 const*, float4*, value_type, unsigned int)> apply_preserve_tag;
     static apply_bind2nd_preserve_tag_wrapper const kernel;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2011  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -21,7 +21,6 @@
 
 #include <halmd/algorithm/gpu/fill_kernel.hpp>
 #include <halmd/utility/gpu/thread.cuh>
-#include <halmd/mdsim/gpu/particle_kernel.cuh> // tie/tag
 
 namespace halmd {
 namespace algorithm {
@@ -29,10 +28,10 @@ namespace gpu {
 namespace fill_kernel {
 
 /**
- * set one value for a whole array
+ * fill array with value
  */
 template <
-    typename value_type // providing this explicitely can be used for conversions
+    typename value_type
   , typename coalesced_value_type
 >
 __global__ void fill(
@@ -47,23 +46,21 @@ __global__ void fill(
 }
 
 /**
- * set one value for a whole array of float4s but preserve the w component
+ * fill array of float4 with value, but preserve the w component
  *
  * This should be useful for tagged float4 fields.
  */
-template<typename vector_type>
+template<typename value_type>
 __global__ void fill_preserve_tag(
     float4* g_data
-  , vector_type value // must have ::static_size=2 or =3
+  , value_type value
   , unsigned int n
 )
 {
-    using halmd::algorithm::gpu::get;
-    using namespace halmd::mdsim::gpu::particle_kernel;
     for (unsigned int i = GTID; i < n; i += GTDIM) {
-        // unsigned int tag = halmd::mdsim::gpu::particle_kernel::untagged<vector_type>(g_data[i]).get<1>(); // boost notation
-        unsigned int tag = get<1>(untagged<vector_type>(g_data[i]));
-        g_data[i] = tagged(value, tag);
+        float w = g_data[i].w;
+        float4 a = value; a.w = w;
+        g_data[i] = a;
     }
 }
 
@@ -84,8 +81,10 @@ fill_wrapper<BOOST_PP_ENUM_PARAMS(2, T)> const fill_wrapper<BOOST_PP_ENUM_PARAMS
     fill_kernel::fill<BOOST_PP_ENUM_PARAMS(2, T)>
 };
 
-template<typename vector_type>
-fill_preserve_tag_wrapper<vector_type> const fill_preserve_tag_wrapper<vector_type>::kernel = { fill_kernel::fill_preserve_tag<vector_type> };
+template<typename value_type>
+fill_preserve_tag_wrapper<value_type> const fill_preserve_tag_wrapper<value_type>::kernel = {
+    fill_kernel::fill_preserve_tag<value_type>
+};
 
 } // namespace algorithm
 } // namespace gpu

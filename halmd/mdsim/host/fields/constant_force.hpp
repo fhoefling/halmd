@@ -81,8 +81,6 @@ private:
     boost::shared_ptr<logger_type> logger_;
     //! The external force field.
     vector_type value_;
-    //! Check whether the field to add/set is zero.
-    bool zero_;
 };
 
 } // namespace fields
