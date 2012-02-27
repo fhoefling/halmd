@@ -1,5 +1,5 @@
 /*
- * Copyright © 2011  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -36,10 +36,10 @@ struct fill_wrapper
     static fill_wrapper const kernel;
 };
 
-template<typename vector_type>
+template<typename value_type>
 struct fill_preserve_tag_wrapper
 {
-    cuda::function<void (float4*, vector_type, unsigned int)> fill_preserve_tag;
+    cuda::function<void (float4*, value_type, unsigned int)> fill_preserve_tag;
     static fill_preserve_tag_wrapper const kernel;
 };
 

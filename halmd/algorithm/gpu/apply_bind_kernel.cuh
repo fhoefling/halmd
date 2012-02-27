@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -36,17 +36,18 @@ template <
   , typename coalesced_input_type
   , typename output_type
   , typename coalesced_output_type
+  , typename value_type
 >
 __global__ void bind1st(
     coalesced_input_type const* g_in
   , coalesced_output_type* g_out
-  , coalesced_input_type g_bind
+  , value_type value
   , unsigned int n
 )
 {
     // coalesced read- and write access to global memory for suitable array types
     for (unsigned int i = GTID; i < n; i += GTDIM) {
-        g_out[i] = transform<functor, input_type, output_type>(g_bind, g_in[i]);
+        g_out[i] = transform<functor, input_type, output_type>(value, g_in[i]);
     }
 }
 
@@ -56,17 +57,18 @@ template <
   , typename coalesced_input_type
   , typename output_type
   , typename coalesced_output_type
+  , typename value_type
 >
 __global__ void bind2nd(
     coalesced_input_type const* g_in
   , coalesced_output_type* g_out
-  , coalesced_input_type g_bind
+  , value_type value
   , unsigned int n
 )
 {
     // coalesced read- and write access to global memory for suitable array types
     for (unsigned int i = GTID; i < n; i += GTDIM) {
-        g_out[i] = transform<functor, input_type, output_type>(g_in[i], g_bind);
+        g_out[i] = transform<functor, input_type, output_type>(g_in[i], value);
     }
 }
 
@@ -74,22 +76,22 @@ template <
     typename functor
   , typename input_type
   , typename output_type
+  , typename value_type
 >
 __global__ void bind2nd_preserve_tag(
     float4 const* g_in
   , float4* g_out
-  , input_type g_bind
+  , value_type value
   , unsigned int n
 )
 {
     // coalesced read- and write access to global memory for suitable array types
     for (unsigned int i = GTID; i < n; i += GTDIM) {
-        unsigned int tag;
-        input_type u;
-        tie(u, tag) = halmd::mdsim::gpu::particle_kernel::untagged<input_type>(g_in[i]);
-        input_type v(g_bind);
-        output_type w = transform<functor, input_type, output_type>(u, v);
-        g_out[i] = halmd::mdsim::gpu::particle_kernel::tagged(w, tag);
+        float4 a = g_in[i];
+        float tag = a.w;
+        a = transform<functor, input_type, output_type>(a, value);
+        a.w = tag;
+        g_out[i] = a;
     }
 }
 
@@ -104,19 +106,19 @@ __global__ void bind2nd_preserve_tag(
 // the template argument names of the *declaration*.
 //
 
-template <BOOST_PP_ENUM_PARAMS(5, typename T)>
-apply_bind1st_wrapper<BOOST_PP_ENUM_PARAMS(5, T)> const apply_bind1st_wrapper<BOOST_PP_ENUM_PARAMS(5, T)>::kernel = {
-    apply_bind_kernel::bind1st<BOOST_PP_ENUM_PARAMS(5, T)>
+template <BOOST_PP_ENUM_PARAMS(6, typename T)>
+apply_bind1st_wrapper<BOOST_PP_ENUM_PARAMS(6, T)> const apply_bind1st_wrapper<BOOST_PP_ENUM_PARAMS(6, T)>::kernel = {
+    apply_bind_kernel::bind1st<BOOST_PP_ENUM_PARAMS(6, T)>
 };
 
-template <BOOST_PP_ENUM_PARAMS(5, typename U)>
-apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(5, U)> const apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(5, U)>::kernel = {
-    apply_bind_kernel::bind2nd<BOOST_PP_ENUM_PARAMS(5, U)>
+template <BOOST_PP_ENUM_PARAMS(6, typename U)>
+apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(6, U)> const apply_bind2nd_wrapper<BOOST_PP_ENUM_PARAMS(6, U)>::kernel = {
+    apply_bind_kernel::bind2nd<BOOST_PP_ENUM_PARAMS(6, U)>
 };
 
-template <BOOST_PP_ENUM_PARAMS(3, typename U)>
-apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(3, U)> const apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(3, U)>::kernel = {
-    apply_bind_kernel::bind2nd_preserve_tag<BOOST_PP_ENUM_PARAMS(3, U)>
+template <BOOST_PP_ENUM_PARAMS(4, typename U)>
+apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(4, U)> const apply_bind2nd_preserve_tag_wrapper<BOOST_PP_ENUM_PARAMS(4, U)>::kernel = {
+    apply_bind_kernel::bind2nd_preserve_tag<BOOST_PP_ENUM_PARAMS(4, U)>
 };
 
 } // namespace algorithm
