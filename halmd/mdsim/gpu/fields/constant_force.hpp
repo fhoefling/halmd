@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -37,25 +37,22 @@ class constant_force
 {
 public:
     typedef gpu::particle<dimension, float_type> particle_type;
-    typedef typename particle_type::gpu_vector_type gpu_vector_type; // 3D: float4, 2D: float2
-    typedef typename halmd::fixed_vector<float, (dimension == 3 ? 4 : 2)> fixed_vector_type; // convertible to/from gpu_vector_type
-    typedef typename particle_type::vector_type vector_type; // fixed_vector
+    typedef typename particle_type::gpu_vector_type gpu_vector_type;
+    typedef typename particle_type::vector_type vector_type;
     typedef logger logger_type;
 
     // Wrapper for transform kernels.
     typedef typename halmd::algorithm::gpu::fill_wrapper<
-        gpu_vector_type
+        vector_type
       , gpu_vector_type
     > fill_wrapper;
     typedef typename halmd::algorithm::gpu::apply_bind2nd_wrapper<
         halmd::algorithm::gpu::sum_
-      , fixed_vector_type
+      , vector_type
       , gpu_vector_type
-      , fixed_vector_type
+      , vector_type
       , gpu_vector_type
     > add_wrapper;
-
-    static char const* module_name() { return "constant_force"; }
 
     static void luaopen(lua_State* L);
 
@@ -85,9 +82,9 @@ private:
     //! module logger
     boost::shared_ptr<logger_type> logger_;
     //! Value of the field to add/set.
-    gpu_vector_type value_;
+    vector_type value_;
     //! Whether the field to add/set is zero.
-    bool zero_;
+    bool is_zero_;
 };
 
 } // namespace fields
