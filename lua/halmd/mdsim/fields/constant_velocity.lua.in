@@ -42,7 +42,9 @@ local po = libhalmd.po
 local h5 = libhalmd.h5
 -- grab standard library
 local assert = assert
+local error = error
 local property = property
+local type = type
 
 module("halmd.mdsim.fields.constant_velocity", halmd.modules.register)
 
@@ -66,8 +68,8 @@ function new(args)
         local value_ = {}
         for i = 1,dimension do value_[i] = value end
         value = value_
-    else
-        error("To initialize a new constant_force, supply a number or an array, but no " .. type(value_))
+    elseif type(value) ~= "table" then
+        error("To initialize a new constant_velocity, supply a number or an array, but no " .. type(value_))
     end
 
     -- check wether to add the field (true) or set (false)
