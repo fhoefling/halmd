@@ -41,7 +41,7 @@ class constant_force
 {
 public:
     typedef host::particle<dimension, float_type> particle_type;
-    typedef typename particle_type::vector_type vector_type;
+    typedef typename particle_type::vector_type vector_type; // fixed_vector
     typedef logger logger_type;
 
     boost::shared_ptr<particle_type> particle;

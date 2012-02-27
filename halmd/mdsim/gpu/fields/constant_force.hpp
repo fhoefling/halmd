@@ -82,6 +82,7 @@ public:
     // Don't use a reference, as this should be called from lua.
     void set_value(vector_type const value)
     {
+        LOG("value reset to " << value);
         value_ = value;
     }
 

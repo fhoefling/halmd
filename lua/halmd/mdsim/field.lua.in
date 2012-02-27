@@ -41,7 +41,9 @@ function new(args)
         return nil
     end
 
-    field = assert(fields[name])()
+    -- construct actual field
+    -- pass the moudule set_force_field down
+    field = assert(fields[name])({set_force_field = args.set_force_field})
 
     -- store name of field
     field.name = property(function(self)
