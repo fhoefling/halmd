@@ -17,9 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <algorithm>    // transform
+#include <algorithm>    // transform, fill
 #include <functional>   // plus, bind1st
-#include <string>       // fill
+#include <string>
 
 #include <halmd/mdsim/host/fields/constant_velocity.hpp>
 #include <halmd/utility/lua/lua.hpp>
@@ -44,41 +44,26 @@ constant_velocity<dimension, float_type>::constant_velocity(
     // set parameters
   , value_(value)
 {
-    zero_ = true;
-    for (int i = 0; i < dimension; ++i) {
-        if (value_[i] != 0) {
-            zero_ = false;
-            break;
-        }
-    }
-    LOG("module initialized with constant force field" << value);
+    LOG("apply constant force field: " << value_);
 }
 
 template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::add()
 {
-    if (zero_) {
-        LOG_ONCE("Addition of a zero velocity field was requested.");
-    }
-    else {
-        LOG_TRACE("Add constant velocity to particle velocities.");
-        transform(
-            particle->v.begin(), particle->v.end(), particle->v.begin()
-          , std::bind1st(plus<vector_type>(), value_)
-        );
-    }
+    LOG_TRACE("add constant velocity field: " << value_);
+
+    transform(
+        particle->v.begin(), particle->v.end(), particle->v.begin()
+      , std::bind1st(plus<vector_type>(), value_)
+    );
 }
 
 template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::set()
 {
-    LOG_TRACE("set particle fields to constant_velocity velocity");
-    fill(particle->f.begin(), particle->f.end(), value_);
-    // The usage of memset(..,0,..) (for the case value_==0)
-    // might be dangerous, as particle->f is a vector of fixed
-    // vectors. It's not guaranteed, that overwriting all bytes
-    // of these with `0' is equivalent to setting them to a
-    // 0-vector.
+    LOG_TRACE("set constant velocity field: " << value_);
+
+    fill(particle->v.begin(), particle->v.end(), value_);
 }
 
 // Wrappers expose signal-functions which can passed to a signal.
@@ -117,7 +102,7 @@ void constant_velocity<dimension, float_type>::luaopen(lua_State* L)
                         >())
                     .property("add", &wrap_add<constant_velocity>)
                     .property("set", &wrap_set<constant_velocity>)
-                    .property("value", &constant_velocity::value)
+                    .property("value", &constant_velocity::value, &constant_velocity::set_value)
                 ]
             ]
         ]

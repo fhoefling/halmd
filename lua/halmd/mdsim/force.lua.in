@@ -1,5 +1,5 @@
 --
--- Copyright © 2010  Peter Colberg
+-- Copyright © 2010-2011  Peter Colberg and Felix Höfling
 --
 -- This file is part of HALMD.
 --
@@ -18,12 +18,11 @@
 --
 
 require("halmd.mdsim.forces")
-require("halmd.mdsim.potentials")
 require("halmd.modules")
 
 -- grab modules
+local mdsim = halmd.mdsim
 local forces = halmd.mdsim.forces
-local potentials = halmd.mdsim.potentials
 -- grab C++ wrappers
 local h5 = libhalmd.h5
 local po = libhalmd.po
@@ -38,12 +37,10 @@ module("halmd.mdsim.force", halmd.modules.register)
 -- construct force module
 --
 function new(args)
-    local force = args.force or "lennard_jones" -- default value
-    -- trade a potential for a force
-    local potential = potentials[force]
-    if potential then
-        return forces.pair_trunc{potential = potential()}
-    end
+    -- initialise forces in each MD step
+    mdsim.fields.constant_force{set_flag = true}
+
+    local force = args.force or "pair_trunc" -- default value
     return assert(forces[force])()
 end
 
@@ -61,13 +58,8 @@ function options(desc, globals)
             choices[name] = module.description()
         end
     end
-    for name, module in pairs(potentials) do
-        if module.description then
-            choices[name] = module.description()
-        end
-    end
 
-    globals:add("force", po.string():choices(choices), "select force module")
+    globals:add("force", po.string():choices(choices), "select force algorithm")
 end
 
 --
@@ -84,10 +76,5 @@ end
 -- @param group HDF5 group
 --
 function write_parameters(force, group, globals)
-    local potential = force.potential
-    if potential then
-        globals:write_attribute("force", h5.string(), potential.module.namespace)
-    else
-        globals:write_attribute("force", h5.string(), force.module.namespace)
-    end
+    globals:write_attribute("force", h5.string(), force.module.namespace)
 end

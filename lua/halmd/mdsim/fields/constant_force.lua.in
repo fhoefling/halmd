@@ -42,15 +42,18 @@ local po = libhalmd.po
 local h5 = libhalmd.h5
 -- grab standard library
 local assert = assert
+local error = error
 local property = property
+local type = type
 
 module("halmd.mdsim.fields.constant_force", halmd.modules.register)
 
 --
 -- construct constant_force module
 --
--- @param args.value   value of constant force vector
--- @param args.add     if present add force field, else call set()
+-- @param args.value            value of constant force vector
+-- @param args.add              if present add force field, else call set()
+-- @param args.set_flag         opposite of args.add but overrides args.add and is not connected to command line arguments
 --
 function new(args)
     -- dependency injection
@@ -59,8 +62,18 @@ function new(args)
     local logger = assert(args.logger)
 
     -- value of the external field to set/add
-    local value = assert(args.value)
-    local use_add = args.add
+    -- if only a scalar is given, construct a vector from it
+    local value = args.value or 0 -- default value
+    if type(value) == "number" then
+        local value_ = {}
+        for i = 1,dimension do value_[i] = value end
+        value = value_
+    elseif type(value) ~= "table" then
+        error("To initialize a new constant_force, supply a number or a table, but no " .. type(args.value))
+    end
+
+    -- check wether to add the field (true) or set (false)
+    local use_add = not args.set_flag and args.add
 
     -- construct module
     local constant_force
@@ -74,9 +87,9 @@ function new(args)
     -- connect field to core
     local core = mdsim.core()
     if use_add then
-        -- add force field via the same signal as force computation
+        -- Add force field to computed forces. (Call after computation of forces.)
         core:on_append_setup{field.add, tracker = field}
-        core:on_force{field.add, tracker = field}
+        core:on_append_force{field.add, tracker = field}
     else
         -- set force field before force computation
         core:on_prepend_setup{field.set, tracker = field}

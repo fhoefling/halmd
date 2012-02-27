@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -37,8 +37,8 @@ class constant_velocity
 {
 public:
     typedef gpu::particle<dimension, float_type> particle_type;
-    typedef typename particle_type::gpu_vector_type gpu_vector_type; // 3D: float4, 2D: float2
-    typedef typename particle_type::vector_type vector_type; // fixed_vector of dim 3 resp. 2
+    typedef typename particle_type::gpu_vector_type gpu_vector_type;
+    typedef typename particle_type::vector_type vector_type;
     typedef logger logger_type;
 
     // Wrapper for transform kernels.
@@ -52,10 +52,7 @@ public:
     typedef typename halmd::algorithm::gpu::apply_bind2nd_preserve_tag_wrapper<
         halmd::algorithm::gpu::sum_
       , vector_type
-      , vector_type
     > add_wrapper;
-
-    static char const* module_name() { return "constant_velocity"; }
 
     static void luaopen(lua_State* L);
 
@@ -79,6 +76,12 @@ public:
         return value_;
     }
 
+    // Don't use a reference, as this should be called from lua.
+    void set_value(vector_type const value)
+    {
+        value_ = value;
+    }
+
 private:
     //! particle instance
     boost::shared_ptr<particle_type> particle_;
@@ -86,8 +89,6 @@ private:
     boost::shared_ptr<logger_type> logger_;
     //! Value of the field to add/set.
     vector_type value_;
-    //! Whether the field to add/set is zero.
-    bool zero_;
 };
 
 } // namespace fields

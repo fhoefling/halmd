@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -41,28 +41,23 @@ constant_force<dimension, float_type>::constant_force(
   : particle_(particle)
   , logger_(logger)
     // parameters
-  , value_(value) // conversion from fixed_vector to float4/float2
+  , value_(value)
+  , is_zero_(value_ == vector_type(0))
 {
-    zero_ = value_.x == 0 and value_.y == 0;
-    if (dimension == 3) {
-        // zero_ = zero_ and value_.z == 0;
-        zero_ = zero_ and value[2] == 0;
-    }
-    LOG("module initialized with constant force field " << value);
+    LOG("apply constant force field: " << value_);
 }
 
 template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::set()
 {
-    LOG_ONCE("set constant force for all particles");
-    if (zero_) {
+    LOG_TRACE("set constant force field: " << value_);
+
+    if (is_zero_) {
         try {
-            cuda::configure(particle_->dim.grid, particle_->dim.block);
             cuda::memset(particle_->g_f, 0, particle_->g_f.capacity());
-            cuda::thread::synchronize();
         }
         catch (cuda::error const&) {
-            LOG_ERROR("failed to set all forces to zero (due to external force field)");
+            LOG_ERROR("failed to set all forces to zero");
             throw;
         }
     }
@@ -73,7 +68,7 @@ void constant_force<dimension, float_type>::set()
             cuda::thread::synchronize();
         }
         catch (cuda::error const&) {
-            LOG_ERROR("failed to set forces according to external force field");
+            LOG_ERROR("failed to set forces");
             throw;
         }
     }
@@ -82,9 +77,10 @@ void constant_force<dimension, float_type>::set()
 template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::add()
 {
-    LOG_ONCE("add external force to all internal forces");
-    if (zero_) {
-        LOG_ONCE("Addition of a zero force field was requested.");
+    LOG_TRACE("add constant force field: " << value_);
+
+    if (is_zero_) {
+        LOG_ONCE("addition of a zero force field requested");
     }
     else {
         try {
@@ -93,7 +89,7 @@ void constant_force<dimension, float_type>::add()
             cuda::thread::synchronize();
         }
         catch (cuda::error const&) {
-            LOG_ERROR("failed to add external force field to internal forces");
+            LOG_ERROR("failed to add external force field");
             throw;
         }
     }
@@ -118,7 +114,7 @@ template <int dimension, typename float_type>
 void constant_force<dimension, float_type>::luaopen(lua_State* L)
 {
     using namespace luabind;
-    static string class_name(module_name() + ("_" + lexical_cast<string>(dimension) + "_"));
+    static string class_name("constant_force_" + lexical_cast<string>(dimension) + "_");
     module(L, "libhalmd")
     [
         namespace_("mdsim")
@@ -135,7 +131,8 @@ void constant_force<dimension, float_type>::luaopen(lua_State* L)
                          >())
                     .property("add", &wrap_add<constant_force>)
                     .property("set", &wrap_set<constant_force>)
-                    .property("value", &constant_force::value)
+                    // the second function is exposed to lua as setter value()
+                    .property("value", &constant_force::value, &constant_force::set_value)
                 ]
             ]
         ]

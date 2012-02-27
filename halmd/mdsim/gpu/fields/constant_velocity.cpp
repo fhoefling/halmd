@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -41,35 +41,30 @@ constant_velocity<dimension, float_type>::constant_velocity(
   : particle_(particle)
   , logger_(logger)
     // parameters
-  , value_(value) // fixed_vector
+  , value_(value)
 {
-    zero_ = true;
-    for (int i = 0; i < dimension; ++i)
-        if (value_[i] != 0)
-        {
-            zero_ = false;
-            break;
-        }
-    LOG("module initialized with constant velocity field " << value_);
+    LOG("apply constant velocity field: " << value_);
 }
 
 template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::set()
 {
-    LOG_ONCE("set constant velocity for all particles");
+    LOG_TRACE("set constant velocity field: " << value_);
+
     try{
         cuda::configure(particle_->dim.grid, particle_->dim.block);
         fill_preserve_tag_wrapper::kernel.fill_preserve_tag(particle_->g_v, value_, particle_->nbox);
         cuda::thread::synchronize();
     }
     catch (cuda::error const&) {
-        LOG_ERROR("failed to set velocities according to external velocity field");
+        LOG_ERROR("failed to set velocities");
         throw;
     }
 
 #ifdef USE_VERLET_DSFUN
     // Set high precision bits of dsfloat to zero.  The external fields are
     // (per definition) not given to such a high precision.
+    // FIXME use cuda::memset
     try{
         cuda::configure(particle_->dim.grid, particle_->dim.block);
         fill_wrapper::kernel.fill(
@@ -80,7 +75,7 @@ void constant_velocity<dimension, float_type>::set()
         cuda::thread::synchronize();
     }
     catch (cuda::error const&) {
-        LOG_ERROR("failed to set high precision bits of velocities to zero (due to external velocity field)");
+        LOG_ERROR("failed to set high precision bits of velocities to zero");
         throw;
     }
 #endif // USE_VERLET_DSFUN
@@ -89,23 +84,19 @@ void constant_velocity<dimension, float_type>::set()
 template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::add()
 {
-    LOG_ONCE("add external velocity to all internal velocities");
-    if (zero_) {
-        LOG_ONCE("Addition of a zero velocity field was requested.");
+    LOG_TRACE("add constant velocity field: " << value_);
+
+    // Only treat the low precision bits of dsfloat.  As the external field
+    // is given with float precision (see above), the float part is added
+    // here, and zeros would be added to the high precision bits.
+    try {
+        cuda::configure(particle_->dim.grid, particle_->dim.block);
+        add_wrapper::kernel.apply_preserve_tag(particle_->g_v, particle_->g_v, value_, particle_->nbox);
+        cuda::thread::synchronize();
     }
-    else {
-        // Only treat the low precision bits of dsfloat.  As the external field
-        // is given with float precision (see above), the float part is added
-        // here, and zeros are added to the high precision bits.
-        try {
-            cuda::configure(particle_->dim.grid, particle_->dim.block);
-            add_wrapper::kernel.apply_preserve_tag(particle_->g_v, particle_->g_v, value_, particle_->nbox);
-            cuda::thread::synchronize();
-        }
-        catch (cuda::error const&) {
-            LOG_ERROR("failed to add external velocity field to internal velocities");
-            throw;
-        }
+    catch (cuda::error const&) {
+        LOG_ERROR("failed to add external velocity field");
+        throw;
     }
 }
 
@@ -128,7 +119,7 @@ template <int dimension, typename float_type>
 void constant_velocity<dimension, float_type>::luaopen(lua_State* L)
 {
     using namespace luabind;
-    static string class_name(module_name() + ("_" + lexical_cast<string>(dimension) + "_"));
+    static string class_name("constant_velocity_" + lexical_cast<string>(dimension) + "_");
     module(L, "libhalmd")
     [
         namespace_("mdsim")
@@ -145,7 +136,8 @@ void constant_velocity<dimension, float_type>::luaopen(lua_State* L)
                          >())
                     .property("add", &wrap_add<constant_velocity>)
                     .property("set", &wrap_set<constant_velocity>)
-                    .property("value", &constant_velocity::value)
+                    // the second function is exposed to lua as setter value()
+                    .property("value", &constant_velocity::value, &constant_velocity::set_value)
                 ]
             ]
         ]

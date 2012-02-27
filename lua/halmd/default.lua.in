@@ -45,10 +45,8 @@ local function script()
     mdsim.position{reader = reader}
     -- set initial particle velocities (optionally from reader)
     mdsim.velocity{reader = reader}
-
     -- setup optional external field
     mdsim.field()
-
     -- setup mobility module
     mdsim.mobility()
 

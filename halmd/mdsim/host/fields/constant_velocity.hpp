@@ -70,13 +70,17 @@ public:
         return value_;
     }
 
+    //! set new value for constant field
+    void set_value(vector_type const value)
+    {
+        value_ = value;
+    }
+
 private:
     /** module logger */
     boost::shared_ptr<logger_type> logger_;
     //! The external velocity field.
     vector_type value_;
-    //! Check whether the field to add/set is zero.
-    bool zero_;
 };
 
 } // namespace fields

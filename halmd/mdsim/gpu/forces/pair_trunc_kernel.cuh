@@ -127,8 +127,10 @@ __global__ void compute(
         }
     }
 
-    // write results to global memory
-    g_f[i] = static_cast<vector_type>(f);
+    // FIXME Add template parameter, so that either this force is set or it's added.
+    // add results to global memory
+    vector_type f_ = g_f[i]; // read from global memory
+    g_f[i] = f_ + static_cast<vector_type>(f); // write to global memory
     if (do_aux) {
         g_en_pot[i] = en_pot_;
         g_stress_pot[i] = stress_pot;

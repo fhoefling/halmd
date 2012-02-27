@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012  Michael Kopp
+ * Copyright © 2012  Michael Kopp and Felix Höfling
  *
  * This file is part of HALMD.
  *
@@ -21,31 +21,27 @@
 #include <halmd/algorithm/gpu/fill_kernel.cuh>
 #include <halmd/numeric/blas/fixed_vector.hpp>
 
-// Explicit instantiation of algorithms must happen in their namespace.
-using namespace halmd::algorithm::gpu; // wrapper
 using namespace halmd; // fixed_vector
+using namespace halmd::algorithm::gpu; // kernel wrapper
 
-// set in 3d
+// fill kernels
 template class fill_wrapper<
-    float4
-  , float4
+    fixed_vector<float, 3>      // value_type
+  , float4                      // coalesced_value_type
 >;
-// set in 2d
 template class fill_wrapper<
-    float2
-  , float2
+    fixed_vector<float, 2>      // value_type
+  , float2                      // coalesced_value_type
 >;
 
-// add in 3d
-// Use fixed_vector, as it has operator+ defined.
+// add constant value to array
 template class apply_bind2nd_wrapper<
     sum_                                // functor
-  , fixed_vector<float, 4>              // input_type
+  , fixed_vector<float, 3>              // input_type
   , float4                              // coalesced_input_type
-  , fixed_vector<float, 4>              // output_type
+  , fixed_vector<float, 3>              // output_type
   , float4                              // coalesced_output_type
 >;
-// add in 2d
 template class apply_bind2nd_wrapper<
     sum_                                // functor
   , fixed_vector<float, 2>              // input_type

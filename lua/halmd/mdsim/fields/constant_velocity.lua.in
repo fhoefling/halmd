@@ -49,8 +49,9 @@ module("halmd.mdsim.fields.constant_velocity", halmd.modules.register)
 --
 -- construct constant_velocity module
 --
--- @param args.value   value of constant velocity vector
--- @param args.add     if present add velocity field, else call set()
+-- @param args.value            value of constant velocity vector
+-- @param args.add              if present add velocity field, else call set()
+-- @param args.set_flag         opposite of args.add but overrides args.add and is not connected to command line arguments
 --
 function new(args)
     -- dependency injection
@@ -59,8 +60,18 @@ function new(args)
     local logger = assert(args.logger)
 
     -- value of the external field to set/add
-    local value = assert(args.value, "a value for the external velocity field is required")
-    local use_add = args.add
+    -- if a scalar is given, construct a vector from it
+    local value = args.value or 0 -- default value
+    if type(value) == "number" then
+        local value_ = {}
+        for i = 1,dimension do value_[i] = value end
+        value = value_
+    else
+        error("To initialize a new constant_force, supply a number or an array, but no " .. type(value_))
+    end
+
+    -- check wether to add the field (true) or set (false)
+    local use_add = not args.set_flag and args.add
 
     -- construct module
     local constant_velocity
@@ -74,15 +85,13 @@ function new(args)
     -- connect field to core
     local core = mdsim.core()
     if use_add then
-        -- add velocity field via the same signal as velocity computation
+        -- Add the velocity field to the computed velocities. (Call after computation of velocities.)
         core:on_append_setup{field.add, tracker = field}
-        -- Add the velocity before the integrator is called; the latter
-        -- requires a completely up to date velocity.
-        core:on_prepend_integrate{field.add, tracker = field}
+        core:on_append_finalize{field.add, tracker = field}
     else
-        -- set velocity field before velocity computation
+        -- set velocity field before velocity computation (on_finalize)
         core:on_prepend_setup{field.set, tracker = field}
-        core:on_prepend_integrate{field.set, tracker = field}
+        core:on_prepend_finalize{field.set, tracker = field}
     end
 
     field.use_add = property(function(self)
