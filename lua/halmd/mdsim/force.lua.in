@@ -22,6 +22,7 @@ require("halmd.mdsim.potentials")
 require("halmd.modules")
 
 -- grab modules
+local mdsim = halmd.mdsim
 local forces = halmd.mdsim.forces
 local potentials = halmd.mdsim.potentials
 -- grab C++ wrappers
@@ -38,12 +39,16 @@ module("halmd.mdsim.force", halmd.modules.register)
 -- construct force module
 --
 function new(args)
+    -- initialise forces in each MD step
+    mdsim.fields.constant_force{set_flag = true}
+
     local force = args.force or "lennard_jones" -- default value
     -- trade a potential for a force
     local potential = potentials[force]
     if potential then
         return forces.pair_trunc{potential = potential()}
     end
+
     return assert(forces[force])()
 end
 

@@ -39,17 +39,12 @@ local function script()
     mdsim.box()
     -- add integrator
     mdsim.integrator()
-    -- set forces for each MD step
-    local set_force_field = mdsim.fields.constant_force{value = 0, set_flag = true}
     -- add force
     local force = mdsim.force()
     -- set initial particle positions (optionally from reader)
     mdsim.position{reader = reader}
     -- set initial particle velocities (optionally from reader)
     mdsim.velocity{reader = reader}
-
-    -- setup optional external field
-    mdsim.field{set_force_field = set_force_field}
 
     -- Construct sampler.
     local sampler = observables.sampler()

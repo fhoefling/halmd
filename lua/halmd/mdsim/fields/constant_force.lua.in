@@ -54,7 +54,6 @@ module("halmd.mdsim.fields.constant_force", halmd.modules.register)
 -- @param args.value            value of constant force vector
 -- @param args.add              if present add force field, else call set()
 -- @param args.set_flag         opposite of args.add but overrides args.add and is not connected to command line arguments
--- @param args.set_force_field  force field registered as setter
 --
 function new(args)
     -- dependency injection
@@ -63,30 +62,18 @@ function new(args)
     local logger = assert(args.logger)
 
     -- value of the external field to set/add
-    local value = {}
     -- if only a scalar is given, construct a vector from it
-    local value_ = assert(args.value)
-    if type(value_) == "number" then
-        for i = 1,dimension do value[i] = value_ end
-    elseif type(value_) == "table" then
+    local value = args.value or 0 -- default value
+    if type(value) == "number" then
+        local value_ = {}
+        for i = 1,dimension do value_[i] = value end
         value = value_
-    else
-        error("To initialize a new constant_force, supply a number or an array, but no " .. type(value_))
+    elseif type(value) ~= "table" then
+        error("To initialize a new constant_force, supply a number or a table, but no " .. type(args.value))
     end
 
     -- check wether to add the field (true) or set (false)
     local use_add = not args.set_flag and args.add
-
-    -- Check whether there already is a constant_force field that sets values.
-    -- If so, and here a set ist requested, also, only change the value
-    -- parameter there and do not construct any further module.  It does not
-    -- make sense to set several, different, fields, as they would cancel each
-    -- other.
-    if args.set_force_field and not use_add then
-        local set_force_field = args.set_force_field
-        set_force_field.value = value
-        return set_force_field
-    end
 
     -- construct module
     local constant_force
@@ -100,9 +87,9 @@ function new(args)
     -- connect field to core
     local core = mdsim.core()
     if use_add then
-        -- add force field via the same signal as force computation
+        -- Add force field to computed forces. (Call after computation of forces.)
         core:on_append_setup{field.add, tracker = field}
-        core:on_force{field.add, tracker = field}
+        core:on_append_force{field.add, tracker = field}
     else
         -- set force field before force computation
         core:on_prepend_setup{field.set, tracker = field}
