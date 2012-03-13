@@ -186,9 +186,6 @@ template <int dimension, typename float_type, typename potential_type>
 template <bool do_aux>
 void pair_full<dimension, float_type, potential_type>::compute_impl_()
 {
-    // initialise particle forces to zero
-    std::fill(particle_->f.begin(), particle_->f.end(), 0);
-
     // initialise potential energy and potential part of stress tensor
     if (do_aux) {
         en_pot_ = 0;
