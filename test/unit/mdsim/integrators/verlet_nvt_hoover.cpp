@@ -356,7 +356,7 @@ BOOST_AUTO_TEST_CASE( verlet_nvt_hoover_host_3d ) {
     verlet_nvt_hoover<host_modules<3, double> >().test();
 }
 
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) && defined(USE_VERLET_DSFUN)
 template <int dimension, typename float_type>
 struct gpu_modules
 {
