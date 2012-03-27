@@ -56,6 +56,11 @@ oseen<dimension, float_type>::oseen(
     LOG("Order of accurancy of hydrodynamic interaction in (a/r): " << order_);
     if( order_ <= 2 ) LOG( "Using Oseen Tensor for hydrodynamic interaction");
     if( order_ >= 3 ) LOG( "Using Rotne-Prager Tensor for hydrodynamic interaction");
+#ifdef USE_OSEEN_DSFUN
+    LOG("Accumulating velocities in double-single precision");
+#else
+    LOG_WARNING("Accumulating velocities in single precision");
+#endif
 }
 
 /**
